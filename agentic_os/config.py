@@ -52,6 +52,6 @@ class Settings:
             return self.provider
         if (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")) and _installed("anthropic"):
             return "anthropic"
-        if (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")) and _installed("google.genai"):
-            return "gemini"
+        if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+            return "gemini"  # works without the SDK too, through Gemini's OpenAI-compatible endpoint
         return "mock"

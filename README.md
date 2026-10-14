@@ -22,6 +22,7 @@ thing as a small, dependency-free agent framework running on Claude.
 
 ```bash
 pip install -e ".[anthropic,gemini]"   # core has zero dependencies; extras add Claude / Gemini
+# On Android (Termux) plain `pip install -e .` is enough: Gemini then uses its OpenAI-compatible endpoint
 export ANTHROPIC_API_KEY=...           # or GEMINI_API_KEY=...; without a key everything runs offline
 
 agentic-os roadmap                     # how the 12 stages map to modules

@@ -122,16 +122,16 @@ class ProviderRegistry:
             try:
                 import anthropic
             except ImportError as exc:  # pragma: no cover - depends on env
-                raise LLMError("The 'anthropic' package is required: pip install 'agentic-os[anthropic]'") from exc
+                raise LLMError("The 'anthropic' package is required: pip install -e \".[anthropic]\" in the agentic-os folder") from exc
             from agentic_os.llm.anthropic_provider import AnthropicProvider
 
             client = anthropic.Anthropic(api_key=cfg.api_key or None, base_url=cfg.base_url or None)
             # Server-side refusal fallbacks exist only on the Anthropic API itself.
             return AnthropicProvider(model or "claude-opus-5-5", client=client, fallbacks=not cfg.base_url)
         if cfg.kind == "gemini":
-            from agentic_os.llm.gemini_provider import DEFAULT_GEMINI_MODEL, GeminiProvider
+            from agentic_os.llm.gemini_provider import gemini_llm
 
-            return GeminiProvider(model or DEFAULT_GEMINI_MODEL, api_key=cfg.api_key or None)
+            return gemini_llm(model or None, api_key=cfg.api_key or None)
         from agentic_os.llm.openai_compat import OpenAICompatProvider
 
         return OpenAICompatProvider(model or "", base_url=cfg.base_url, api_key=cfg.api_key or None)

@@ -40,7 +40,7 @@ class AnthropicProvider(LLMProvider):
                 import anthropic
             except ImportError as exc:  # pragma: no cover - depends on env
                 raise LLMError(
-                    "The 'anthropic' package is required: pip install 'agentic-os[anthropic]'"
+                    "The 'anthropic' package is required: pip install -e \".[anthropic]\" in the agentic-os folder"
                 ) from exc
             client = anthropic.Anthropic()
         self.client = client
