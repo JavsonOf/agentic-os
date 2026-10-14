@@ -281,3 +281,18 @@ def test_serve_refuses_public_interface_without_password():
     with pytest.raises(SystemExit, match="AGENTIC_OS_API_KEY"):
         serve(system, host="0.0.0.0", port=0)
     system.shutdown()
+
+
+def test_gemini_falls_back_to_openai_endpoint_without_sdk(monkeypatch):
+    from agentic_os.llm import gemini_provider
+    from agentic_os.llm.openai_compat import OpenAICompatProvider
+
+    monkeypatch.setattr(gemini_provider, "sdk_available", lambda: False)
+    llm = gemini_provider.gemini_llm(None, api_key="test-key")
+    assert isinstance(llm, OpenAICompatProvider)
+    assert llm.base_url == gemini_provider.GEMINI_OPENAI_BASE_URL
+    assert (llm.model, llm.api_key) == ("gemini-flash-latest", "test-key")
+
+    registry = ProviderRegistry()
+    registry.upsert(ProviderConfig(id="gemini", kind="gemini", api_key="k"))
+    assert isinstance(registry.build("gemini", "gemma-3-27b-it"), OpenAICompatProvider)

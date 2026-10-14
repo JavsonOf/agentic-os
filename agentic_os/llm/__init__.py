@@ -16,10 +16,10 @@ def create_llm(settings=None) -> LLMProvider:
 
         return AnthropicProvider(settings.model, effort=settings.effort, fallbacks=settings.fallbacks)
     if provider == "gemini":
-        from agentic_os.llm.gemini_provider import DEFAULT_GEMINI_MODEL, GeminiProvider
+        from agentic_os.llm.gemini_provider import DEFAULT_GEMINI_MODEL, gemini_llm
 
         model = settings.model if not settings.model.startswith("claude") else DEFAULT_GEMINI_MODEL
-        return GeminiProvider(model)
+        return gemini_llm(model)
     if provider == "mock":
         return HeuristicLLM()
     raise LLMError(f"Unknown provider: {provider!r}")

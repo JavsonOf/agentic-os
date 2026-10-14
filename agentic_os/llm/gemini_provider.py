@@ -1,8 +1,15 @@
-"""Gemini backend built on the official Google Gen AI SDK (``google-genai``)."""
+"""Gemini backend built on the official Google Gen AI SDK (``google-genai``).
+
+When the SDK is not installed (it needs compiled dependencies that some
+platforms, such as Android/Termux, cannot build), :func:`gemini_llm` falls
+back to Gemini's OpenAI-compatible endpoint, which needs nothing extra.
+"""
 
 from __future__ import annotations
 
+import importlib.util
 import itertools
+import os
 from typing import TYPE_CHECKING, Any
 
 from agentic_os.llm.base import LLMError, LLMProvider, LLMResponse, Message, ToolCall
@@ -11,6 +18,8 @@ if TYPE_CHECKING:  # pragma: no cover
     from agentic_os.tools.registry import Tool
 
 DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
+GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+SDK_MISSING = "The 'google-genai' package is required: pip install -e \".[gemini]\" in the agentic-os folder"
 _GENERATED_PREFIX = "gemcall_"
 _ids = itertools.count(1)
 _REFUSAL_REASONS = {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION", "IMAGE_SAFETY"}
@@ -20,7 +29,7 @@ def _types():
     try:
         from google.genai import types
     except ImportError as exc:  # pragma: no cover - depends on env
-        raise LLMError("The 'google-genai' package is required: pip install 'agentic-os[gemini]'") from exc
+        raise LLMError(SDK_MISSING) from exc
     return types
 
 
@@ -41,7 +50,7 @@ class GeminiProvider(LLMProvider):
             try:
                 from google import genai
             except ImportError as exc:  # pragma: no cover - depends on env
-                raise LLMError("The 'google-genai' package is required: pip install 'agentic-os[gemini]'") from exc
+                raise LLMError(SDK_MISSING) from exc
             client = genai.Client(api_key=api_key) if api_key else genai.Client()
         self.client = client
         self.model = model
@@ -166,3 +175,21 @@ def from_gemini_response(response: Any, model: str = "") -> LLMResponse:
         model=served,
         raw_content=candidate.content,
     )
+
+
+def sdk_available() -> bool:
+    try:
+        return importlib.util.find_spec("google.genai") is not None
+    except ModuleNotFoundError:  # the 'google' namespace itself is missing
+        return False
+
+
+def gemini_llm(model: str | None = None, api_key: str | None = None) -> LLMProvider:
+    """The best available Gemini client: the official SDK, else the OpenAI-compatible endpoint."""
+    model = model or DEFAULT_GEMINI_MODEL
+    if sdk_available():
+        return GeminiProvider(model, api_key=api_key)
+    from agentic_os.llm.openai_compat import OpenAICompatProvider
+
+    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    return OpenAICompatProvider(model, base_url=GEMINI_OPENAI_BASE_URL, api_key=key)
