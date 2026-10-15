@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -14,6 +15,7 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -49,8 +51,8 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
-        } else if (serverUrl().isEmpty()) {
-            askForServer(true);
+        } else if (Friendly.parseAddress(serverUrl()).url == null) {
+            askForServer(true); // nothing saved yet, or an address saved by an older version that cannot work
         } else {
             webView.loadUrl(serverUrl());
         }
@@ -82,7 +84,15 @@ public class MainActivity extends Activity {
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) {
-                    showOfflinePage(String.valueOf(error.getDescription()));
+                    showOfflinePage(Friendly.networkError(error.getErrorCode(), String.valueOf(error.getDescription()), isOnline()));
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                String[] message = Friendly.httpError(response.getStatusCode());
+                if (request.isForMainFrame() && message != null) {
+                    showOfflinePage(message);
                 }
             }
         });
@@ -115,7 +125,7 @@ public class MainActivity extends Activity {
     private void askForServer(boolean firstRun) {
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        input.setHint("https://1-2-3-4.sslip.io");
+        input.setHint("np. https://twoj-serwer-8000.app.github.dev");
         input.setText(serverUrl());
         input.setSingleLine(true);
         int pad = (int) (20 * getResources().getDisplayMetrics().density);
@@ -137,11 +147,12 @@ public class MainActivity extends Activity {
                 })
                 .create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            String url = normalize(input.getText().toString());
-            if (url == null) {
-                input.setError("Wpisz adres zaczynający się od https://");
+            Friendly.Address address = Friendly.parseAddress(input.getText().toString());
+            if (address.url == null) {
+                input.setError(address.problem);
                 return;
             }
+            String url = address.url;
             getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_URL, url).apply();
             dialog.dismiss();
             webView.clearHistory();
@@ -153,35 +164,28 @@ public class MainActivity extends Activity {
         dialog.show();
     }
 
-    /** Accepts "1.2.3.4:8000", "example.com" or full URLs; returns null when it is not usable. */
-    static String normalize(String raw) {
-        String url = raw.trim();
-        if (url.isEmpty() || url.contains(" ")) {
-            return null;
-        }
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            boolean local = url.startsWith("localhost") || url.startsWith("127.0.0.1");
-            url = (local ? "http://" : "https://") + url;
-        }
-        Uri parsed = Uri.parse(url);
-        if (parsed.getHost() == null || parsed.getHost().isEmpty()) {
-            return null;
-        }
-        return url.endsWith("/") ? url : url + "/";
+    private boolean isOnline() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        return cm == null || cm.getActiveNetwork() != null;
     }
 
-    private void showOfflinePage(String reason) {
+    /** A calm, themed page with what went wrong in plain Polish; never the raw "net::ERR_…" code. */
+    private void showOfflinePage(String[] message) {
         String html = "<!doctype html><html lang=pl><head><meta name=viewport content='width=device-width,initial-scale=1'>"
-                + "<style>body{background:#0b1020;color:#e8ecf8;font:16px system-ui,sans-serif;padding:32px;}"
-                + "a{display:block;margin:14px 0;padding:14px;border-radius:12px;text-align:center;text-decoration:none;"
-                + "background:#6ea8ff;color:#0b1020;font-weight:600}a.ghost{background:#1b2440;color:#e8ecf8}"
-                + "small{color:#9aa5c4}</style></head><body>"
-                + "<h2>Brak połączenia z Agentic OS</h2>"
-                + "<p>Nie udało się otworzyć <b>" + escape(serverUrl()) + "</b>.</p>"
-                + "<p><small>" + escape(reason) + "</small></p>"
-                + "<p><small>Sprawdź internet i czy serwer działa.</small></p>"
-                + "<a href='" + escape(serverUrl()) + "'>Spróbuj ponownie</a>"
-                + "<a class=ghost href='" + SETTINGS_LINK + "'>Zmień adres serwera</a>"
+                + "<meta name=color-scheme content='light dark'><style>"
+                + ":root{--bg:#f5f6f4;--card:#fff;--text:#1a1d1c;--muted:#5f6763;--accent:#0f766e;--on:#fff;--line:#e1e4e0}"
+                + "@media (prefers-color-scheme:dark){:root{--bg:#111413;--card:#1b1f1e;--text:#e9ecea;--muted:#9aa39e;"
+                + "--accent:#2bb3a3;--on:#06201d;--line:#2f3633}}"
+                + "body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,sans-serif;padding:40px 24px}"
+                + "h1{font-size:26px;line-height:1.2;margin:0 0 12px;letter-spacing:-.4px}p{margin:0 0 10px;color:var(--muted)}"
+                + "a{display:block;margin:14px 0 0;padding:15px;border-radius:16px;text-align:center;text-decoration:none;font-weight:700}"
+                + ".go{background:var(--accent);color:var(--on)}.alt{background:var(--card);color:var(--text);border:1px solid var(--line)}"
+                + "small{display:block;margin-top:22px;color:var(--muted);word-break:break-all}</style></head><body>"
+                + "<h1>" + escape(message[0]) + "</h1>"
+                + "<p>" + escape(message[1]) + "</p>"
+                + "<a class=go href='" + escape(serverUrl()) + "'>Spróbuj ponownie</a>"
+                + "<a class=alt href='" + SETTINGS_LINK + "'>Zmień adres serwera</a>"
+                + "<small>Adres: " + escape(serverUrl()) + "</small>"
                 + "</body></html>";
         webView.loadDataWithBaseURL(serverUrl(), html, "text/html", "utf-8", null);
     }
