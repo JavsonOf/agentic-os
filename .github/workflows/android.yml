@@ -10,6 +10,11 @@ on:
 permissions:
   contents: write  # publish the APK as a GitHub release on main
 
+# Releases are numbered one after another, so two merges must not compute the same version at once.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('apk-{0}', github.ref) || 'releases' }}
+  cancel-in-progress: false
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -24,6 +29,26 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"
+      - name: Release version, title and notes
+        id: notes
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          # SemVer from CHANGELOG.md: vX.Y.Z – English title (see "Wersje i nazwy wydań" there)
+          previous=$(git tag --list 'v*' 'android-*' --sort=-creatordate | head -n 1)
+          version=$(python3 scripts/release_notes.py --next-version "$previous")
+          title=$(python3 scripts/release_notes.py --next-title "$previous")
+          python3 scripts/release_notes.py --since "$previous" > release-notes.md
+          # A release only for real changes (or a new app build); "Drobne zmiany" wait for the next one.
+          worth=$(python3 scripts/release_notes.py --worth-release "$previous")
+          if [ -z "$previous" ] || ! git diff --quiet "$previous" HEAD -- android; then worth=yes; fi
+          {
+            echo "publish=$worth"
+            echo "version=$version"
+            echo "name=$version – $title"
+          } >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=${version#v}" >> "$GITHUB_ENV"
+          echo "Previous: ${previous:-none} · next: $version – $title · publish: $worth"
+          cat release-notes.md
       - name: Build APK
         run: gradle -p android --no-daemon assembleRelease testReleaseUnitTest
       - name: Rename APK
@@ -32,24 +57,12 @@ jobs:
         with:
           name: AgenticOS-apk
           path: AgenticOS.apk
-      - name: Release notes
-        id: notes
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        run: |
-          previous=$(git tag --list 'android-*' --sort=-v:refname | head -n 1)
-          python3 scripts/release_notes.py --since "$previous" > release-notes.md
-          cat release-notes.md
-          # A release only for real changes (or a new app build); "Drobne zmiany" wait for the next one.
-          worth=$(python3 scripts/release_notes.py --worth-release "$previous")
-          if [ -z "$previous" ] || ! git diff --quiet "$previous" HEAD -- android; then worth=yes; fi
-          echo "publish=$worth" >> "$GITHUB_OUTPUT"
-          echo "Publish a release: $worth"
       - name: Publish release
         if: steps.notes.outputs.publish == 'yes'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-${{ github.run_number }}
-          name: Agentic OS – wydanie ${{ github.run_number }} · Release ${{ github.run_number }}
+          tag_name: ${{ steps.notes.outputs.version }}
+          name: ${{ steps.notes.outputs.name }}
           make_latest: true
           files: AgenticOS.apk
           body_path: release-notes.md  # what changed, from CHANGELOG.md

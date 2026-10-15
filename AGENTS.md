@@ -79,6 +79,20 @@ paste keys into chat, do not put keys in environment files you commit, and never
   notes automatically, so keep them general: what changed for the user, never keys, passwords, addresses,
   internal paths or how a security problem could be exploited (say "Poprawiono bezpieczeństwo …" instead).
 
+## Release versions and names
+
+- Releases and their git tags use SemVer `vMAJOR.MINOR.PATCH` (now `v0.MINOR.PATCH`), numbered one after
+  another. Never use workflow run numbers or PR numbers as release names or tags.
+- MAJOR: breaking changes or the first stable release (`v1.0.0`). MINOR: new features, screens or
+  integrations (points under "Dodano"). PATCH: fixes, improvements, CI/CD, refactoring and docs. Put CI and
+  docs work under "Zmieniono" or "Drobne zmiany", not "Dodano", so it does not bump MINOR.
+- Release title, in English because the repository is public: `vX.Y.Z – Short Title Case Summary`
+  (e.g. `v0.2.1 – Clear Connection Errors in the Android App`), without "Agentic OS" or "Release". The notes
+  stay in Polish. Write the title in the `Tytuł:` line of **Następne wydanie** in `CHANGELOG.md`; add
+  `Wersja: major` (or `minor`) only to force a bigger bump.
+- The android workflow computes the version and publishes the release; `release-notes` keeps older releases
+  in line with `CHANGELOG.md`. Test builds, if ever needed, use suffixes such as `v0.3.0-beta.1`.
+
 ## Never
 
 - Commit secrets: API keys, passwords, tokens or `.env` files.
