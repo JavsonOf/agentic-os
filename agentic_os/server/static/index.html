@@ -33,20 +33,16 @@
   <div id="app" class="app hidden">
     <header class="topbar">
       <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 8l8 8M16 8l-8 8"/></svg></span><span>Agentic OS</span></div>
-      <div id="model-badge" class="badge" title="Domyślny model"></div>
+      <button id="model-badge" class="badge" type="button" data-go="models" title="Domyślny model – zmień w Modele"></button>
       <button id="install-btn" class="btn small hidden" type="button">Zainstaluj</button>
-      <button id="theme-btn" class="icon-btn" type="button" aria-label="Motyw"></button>
     </header>
 
     <nav class="tabs" aria-label="Sekcje">
       <button data-tab="chat" class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><span>Czat</span></button>
-      <button data-tab="agents" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4M9.5 12h.01M14.5 12h.01"/></svg><span>Agenci</span></button>
       <button data-tab="tasks" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Zadania</span></button>
-      <button data-tab="brain" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><path d="M8 12h2M13.7 10.8l2.6-3.6M13.7 13.2l2.6 3.6"/></svg><span>Mózg</span></button>
       <button data-tab="knowledge" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg><span>Wiedza</span></button>
-      <button data-tab="ext" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4V4z"/></svg><span>Dodatki</span></button>
       <button data-tab="models" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/></svg><span>Modele</span></button>
-      <button data-tab="monitor" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Monitor</span></button>
+      <button data-tab="me" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span>Ty</span></button>
     </nav>
 
     <div id="approvals" class="approvals hidden" aria-live="assertive"></div>
@@ -72,6 +68,7 @@
 
       <!-- AGENCI -->
       <section id="tab-agents" class="panel">
+        <button class="back-btn" type="button" data-go="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Ty</span></button>
         <h2>Twoi agenci</h2>
         <div id="agent-list" class="grid"></div>
 
@@ -155,6 +152,7 @@
 
       <!-- MÓZG -->
       <section id="tab-brain" class="panel">
+        <button class="back-btn" type="button" data-go="knowledge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Wiedza</span></button>
         <div class="section-head"><h2>Mózg agenta</h2><button id="brain-refresh" class="btn small ghost" type="button">Odśwież</button></div>
         <p class="muted small">Dokumenty, fragmenty wiedzy i wspomnienia połączone podobieństwem znaczeń. Dotknij punktu, żeby zobaczyć treść.</p>
         <div class="legend" id="brain-legend"></div>
@@ -176,7 +174,12 @@
 
       <!-- WIEDZA -->
       <section id="tab-knowledge" class="panel">
-        <h2>Baza wiedzy</h2>
+        <h2>Wiedza</h2>
+        <button class="menu-item card-link" type="button" data-go="brain">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><path d="M8 12h2M13.7 10.8l2.6-3.6M13.7 13.2l2.6 3.6"/></svg></span>
+          <span class="menu-text"><b>Mózg i pamięć</b><small>Graf wspomnień agenta i import pamięci z ChatGPT lub Claude</small></span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
         <form id="kb-form" class="card stack">
           <label class="field"><span>Tytuł</span><input name="source" placeholder="np. cennik.md"></label>
           <label class="field"><span>Treść</span><textarea name="text" rows="5" required placeholder="Wklej tekst, z którego agenci mają korzystać…"></textarea></label>
@@ -190,6 +193,7 @@
 
       <!-- ROZSZERZENIA -->
       <section id="tab-ext" class="panel">
+        <button class="back-btn" type="button" data-go="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Ty</span></button>
         <h2>Rozszerzenia</h2>
 
         <h3>🎓 Skille (umiejętności)</h3>
@@ -270,6 +274,14 @@
             <button class="btn primary" type="submit">Zapisz</button>
           </form>
         </details>
+      </section>
+
+      <!-- TY: ustawienia i rzadziej używane sekcje -->
+      <section id="tab-me" class="panel">
+        <div class="profile">
+          <span class="avatar">TY</span>
+          <div><h2>Twoje ustawienia</h2><p class="muted small" id="me-server"></p></div>
+        </div>
         <section class="card stack" aria-labelledby="look-title">
           <h3 id="look-title">Wygląd</h3>
           <fieldset class="segmented" id="theme-choice">
@@ -280,10 +292,36 @@
           </fieldset>
           <p class="muted small">„Systemowy” przełącza się razem z ustawieniem telefonu lub komputera.</p>
         </section>
+        <h3 class="group-title">Agenci i narzędzia</h3>
+        <div class="menu-list">
+          <button class="menu-item" type="button" data-go="agents">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4M9.5 12h.01M14.5 12h.01"/></svg></span>
+            <span class="menu-text"><b>Agenci</b><small>Twoi agenci, uprawnienia, zespoły i agenci zewnętrzni</small></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button class="menu-item" type="button" data-go="ext">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4V4z"/></svg></span>
+            <span class="menu-text"><b>Rozszerzenia</b><small>Skille, własne narzędzia (mody) i serwery MCP</small></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+        <h3 class="group-title">Aplikacja</h3>
+        <div class="menu-list">
+          <button class="menu-item" type="button" data-go="monitor">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+            <span class="menu-text"><b>Monitoring</b><small>Statystyki, tokeny i czasy odpowiedzi</small></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button class="menu-item danger" type="button" id="logout-btn">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></span>
+            <span class="menu-text"><b>Wyloguj</b><small>Usuwa hasło zapisane w tej przeglądarce</small></span>
+          </button>
+        </div>
       </section>
 
       <!-- MONITORING -->
       <section id="tab-monitor" class="panel">
+        <button class="back-btn" type="button" data-go="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Ty</span></button>
         <div class="section-head"><h2>Monitoring</h2><button id="monitor-refresh" class="btn small ghost" type="button">Odśwież</button></div>
         <div id="monitor-stats" class="stats"></div>
         <div id="monitor-timings" class="card"></div>

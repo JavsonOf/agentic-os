@@ -152,42 +152,37 @@ $("#login-form").addEventListener("submit", async (e) => {
 
 /* ------------------------------------------------------------------ theme */
 const THEMES = { light: "Jasny", dark: "Ciemny", system: "Systemowy" };
-const THEME_ICONS = {
-  light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-  dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
-  system: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',
-};
 function currentTheme() { const t = store.get("aos_theme", "system"); return THEMES[t] ? t : "system"; }
 function applyTheme(mode) {
   if (mode === "system") { delete document.documentElement.dataset.theme; store.del("aos_theme"); }
   else { document.documentElement.dataset.theme = mode; store.set("aos_theme", mode); }
-  const btn = $("#theme-btn");
-  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">${THEME_ICONS[mode]}</svg>`;
-  btn.setAttribute("aria-label", `Motyw: ${THEMES[mode]}. Kliknij, aby zmienić.`);
-  btn.title = `Motyw: ${THEMES[mode]}`;
   const radio = document.querySelector(`#theme-choice input[value="${mode}"]`);
   if (radio) radio.checked = true;
   if (state.tab === "brain" && brain.nodes.length) simulate(300); // the graph is drawn with theme colours
 }
-$("#theme-btn").addEventListener("click", () => {
-  // From "system" jump to the opposite of what is showing, so the first tap always changes something.
-  const mode = currentTheme();
-  const showingDark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const next = mode === "system" ? (showingDark ? "light" : "dark") : mode === "light" ? "dark" : "system";
-  applyTheme(next); toast(`Motyw: ${THEMES[next]}`);
-});
-$("#theme-choice").addEventListener("change", (e) => applyTheme(e.target.value));
+$("#theme-choice").addEventListener("change", (e) => { applyTheme(e.target.value); toast(`Motyw: ${THEMES[e.target.value]}`); });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (state.tab === "brain" && brain.nodes.length) simulate(300); });
 
 /* ------------------------------------------------------------------- tabs */
+/* Five tabs in the bottom bar; the other sections open from "Wiedza" or "Ty" and keep that tab lit. */
+const TAB_PARENT = { agents: "me", ext: "me", monitor: "me", brain: "knowledge" };
 function showTab(name) {
+  if (!document.getElementById("tab-" + name)) name = "chat";
   state.tab = name;
-  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
+  const lit = TAB_PARENT[name] || name;
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === lit));
   document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + name));
   store.set("aos_tab", name);
-  ({ agents: loadAgents, tasks: loadTasks, brain: loadBrain, knowledge: loadKnowledge, ext: loadExt, models: loadModels, monitor: loadMonitor }[name] || (() => {}))();
+  ({ agents: loadAgents, tasks: loadTasks, brain: loadBrain, knowledge: loadKnowledge, ext: loadExt, models: loadModels, monitor: loadMonitor, me: loadMe }[name] || (() => {}))();
+  $("main").scrollTop = 0;
 }
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showTab(t.dataset.tab)));
+document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.go)));
+function loadMe() { $("#me-server").textContent = `Połączono z ${location.host}`; }
+$("#logout-btn").addEventListener("click", () => {
+  if (!confirm("Wylogować z War Room na tym urządzeniu?")) return;
+  token = ""; store.del("aos_token"); showLogin();
+});
 
 /* --------------------------------------------------------------- shared */
 async function refreshAgents() {

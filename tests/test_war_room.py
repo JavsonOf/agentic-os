@@ -330,8 +330,20 @@ def test_war_room_offers_light_dark_and_system_themes():
     # "Systemowy" follows the OS, the two others force a palette regardless of it.
     assert "@media (prefers-color-scheme: dark)" in css and ':root:not([data-theme="light"])' in css
     assert ':root[data-theme="dark"]' in css
-    assert 'id="theme-btn"' in html
     for value in ("light", "dark", "system"):
         assert f'name="theme" value="{value}"' in html
     # the saved choice is applied in <head>, before the first paint
     assert html.index('localStorage.getItem("aos_theme")') < html.index("<body>")
+
+
+def test_war_room_bottom_bar_has_the_five_version_c_tabs():
+    html = (Path(__file__).resolve().parent.parent / "agentic_os" / "server" / "static" / "index.html").read_text(encoding="utf-8")
+    import re
+
+    tabs = re.findall(r'<button data-tab="(\w+)" class="tab[^"]*">.*?<span>([^<]+)</span>', html)
+    assert tabs == [("chat", "Czat"), ("tasks", "Zadania"), ("knowledge", "Wiedza"), ("models", "Modele"), ("me", "Ty")]
+    # the other sections are still reachable from "Wiedza" and "Ty"
+    for section in ("agents", "ext", "monitor", "brain", "me"):
+        assert f'id="tab-{section}"' in html
+        if section != "me":
+            assert f'data-go="{section}"' in html
