@@ -1,7 +1,7 @@
 name: release-notes
 
-# Gives every GitHub release its Polish/English name and writes the notes from CHANGELOG.md into the
-# releases that have their own section there, so editing CHANGELOG.md on main also updates older releases.
+# Keeps GitHub releases in line with CHANGELOG.md: releases published before SemVer move to their
+# vX.Y.Z tag ("dawniej android-N" lines), and every release gets its title and notes from its section.
 on:
   push:
     branches: [main]
@@ -9,25 +9,41 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # edit release descriptions
+  contents: write  # rename tags and edit release titles and notes
+
+concurrency:
+  group: releases
+  cancel-in-progress: false
 
 jobs:
   notes:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Update release names and descriptions
-        env:
-          GH_TOKEN: ${{ github.token }}
+        with:
+          fetch-depth: 0
+      - name: Move old releases to their SemVer tags
         run: |
-          # Every release gets the Polish/English name; releases with a CHANGELOG.md section also get its notes.
-          for tag in $(gh release list --limit 200 --json tagName --jq '.[].tagName' | grep -E '^android-[0-9]+$'); do
-            n=${tag#android-}
-            args=(--title "Agentic OS – wydanie $n · Release $n")
-            if grep -qE "^## $tag( |$)" CHANGELOG.md; then
-              python3 scripts/release_notes.py --tag "$tag" > notes.md
-              args+=(--notes-file notes.md)
+          python3 scripts/release_notes.py --migrations | while read -r old new; do
+            if ! gh release view "$new" > /dev/null 2>&1; then
+              if ! gh release view "$old" > /dev/null 2>&1; then echo "No release $old, skipped"; continue; fi
+              sha=$(git rev-list -n 1 "$old")
+              gh api -X POST "repos/${{ github.repository }}/git/refs" -f ref="refs/tags/$new" -f sha="$sha" > /dev/null 2>&1 || true
+              gh release edit "$old" --tag "$new"
+              echo "Moved $old to $new"
             fi
-            gh release edit "$tag" "${args[@]}"
+            if git ls-remote --exit-code --tags origin "refs/tags/$old" > /dev/null; then
+              gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$old"
+              echo "Deleted old tag $old"
+            fi
+          done
+      - name: Update release titles and notes
+        run: |
+          for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
+            if ! gh release view "$tag" > /dev/null 2>&1; then echo "No release $tag, skipped"; continue; fi
+            python3 scripts/release_notes.py --tag "$tag" > notes.md
+            gh release edit "$tag" --title "$tag — $(python3 scripts/release_notes.py --title "$tag")" --notes-file notes.md
             echo "Updated $tag"
           done

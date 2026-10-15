@@ -11,7 +11,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-        versionName = "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        versionName = System.getenv("APP_VERSION") ?: "0.0.0-dev"  // release version from CHANGELOG.md
     }
 
     signingConfigs {
