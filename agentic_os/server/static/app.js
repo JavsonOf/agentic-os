@@ -141,7 +141,10 @@ async function refreshProviders() {
   const data = await api("/providers");
   state.providers = data.providers; state.presets = data.presets;
   const d = data.default;
-  $("#model-badge").textContent = d.model ? `🧠 ${d.model}` : `🧠 ${d.name || "offline"}`;
+  // Without a configured provider the OS falls back to an offline demo model that cannot understand questions.
+  const offline = !d.model && (!d.name || d.name === "heuristic");
+  $("#model-badge").textContent = offline ? "⚠️ brak modelu AI" : `🧠 ${d.model || d.name}`;
+  $("#offline-banner").classList.toggle("hidden", !offline);
   return data;
 }
 
@@ -206,6 +209,7 @@ $("#chat-reset").addEventListener("click", async () => {
   try { await api("/chat/reset", { method: "POST", body: { agent, session: sessionId(agent) } }); } catch { /* ignore */ }
   store.del("aos_session_" + agent); chatEmpty(); toast("Nowa rozmowa");
 });
+$("#offline-fix").addEventListener("click", () => showTab("models"));
 function chatEmpty() { chatLog.replaceChildren(el("div", { class: "empty" }, el("div", { text: "👋 Napisz, co mam zrobić." }), el("div", { class: "small", text: "Agent użyje narzędzi, pamięci i Twojej bazy wiedzy." }))); }
 
 /* ----------------------------------------------------------------- agents */

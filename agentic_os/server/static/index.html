@@ -53,6 +53,10 @@
           <label class="field inline"><span class="sr-only">Uprawnienia agenta</span><select id="chat-permission" title="Uprawnienia agenta: możesz je zmienić w każdej chwili"></select></label>
           <button id="chat-reset" class="btn small ghost" type="button">Nowa rozmowa</button>
         </div>
+        <div id="offline-banner" class="offline-banner hidden" role="status">
+          <span>⚠️ <b>Brak modelu AI.</b> Agent działa w trybie offline i nie rozumie pytań. Dodaj klucz, np. Gemini.</span>
+          <button id="offline-fix" class="btn small primary" type="button">🔑 Dodaj klucz</button>
+        </div>
         <div id="chat-log" class="chat-log" aria-live="polite"></div>
         <form id="chat-form" class="chat-input">
           <textarea id="chat-text" rows="1" placeholder="Napisz do agenta…" required></textarea>
