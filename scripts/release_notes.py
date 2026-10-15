@@ -2,6 +2,10 @@
 
     python scripts/release_notes.py --tag android-9        notes of a release that has its own section
     python scripts/release_notes.py --since android-9      points added to "Następne wydanie" since that release
+    python scripts/release_notes.py --worth-release android-9   "yes" if those points deserve their own release
+
+Points under "Drobne zmiany" are information only: they never start a release on their own and are
+listed in the next release that has a real change (Dodano, Zmieniono, Usunięto, Naprawiono, Ulepszono).
 
 Sections are "## <tag> · <date>" for published releases and any other "## ..." heading (normally
 "Następne wydanie") for changes that are not released yet. Points are grouped by "### <category>".
@@ -15,7 +19,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-CATEGORIES = ("Dodano", "Zmieniono", "Usunięto", "Naprawiono", "Ulepszono")
+CATEGORIES = ("Dodano", "Zmieniono", "Usunięto", "Naprawiono", "Ulepszono", "Drobne zmiany")
+MINOR = "Drobne zmiany"
 TAG_HEADING = re.compile(r"^##\s+(android-\d+)\b")
 INSTALL = ("---\n**Instalacja na Androidzie:** otwórz tę stronę na telefonie, dotknij **AgenticOS.apk** i zezwól "
            "przeglądarce na instalację, gdy zapyta. Nowa wersja instaluje się na poprzedniej.")
@@ -52,10 +57,19 @@ def notes_for_tag(text: str, tag: str) -> str:
     return render([(c, p) for t, c, p in parse(text) if t == tag])
 
 
-def notes_since(text: str, previous_text: str) -> str:
+def new_points(text: str, previous_text: str) -> list[tuple[str, str]]:
     """Unreleased points that were not there when the previous release was published."""
     old = {p for _, _, p in parse(previous_text)}
-    return render([(c, p) for t, c, p in parse(text) if t is None and p not in old])
+    return [(c, p) for t, c, p in parse(text) if t is None and p not in old]
+
+
+def notes_since(text: str, previous_text: str) -> str:
+    return render(new_points(text, previous_text))
+
+
+def worth_release(text: str, previous_text: str) -> bool:
+    """A release is worth it when at least one new point is more than a minor change."""
+    return any(c != MINOR for c, _ in new_points(text, previous_text))
 
 
 def file_at(ref: str, path: str = "CHANGELOG.md") -> str:
@@ -68,9 +82,14 @@ def main(argv: list[str] | None = None) -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--tag", help="release with its own section in CHANGELOG.md")
     group.add_argument("--since", help="previous release tag (empty for the first release)")
+    group.add_argument("--worth-release", metavar="PREVIOUS", help="print yes/no: do the new points deserve a release")
     parser.add_argument("--changelog", default="CHANGELOG.md")
     args = parser.parse_args(argv)
     text = Path(args.changelog).read_text(encoding="utf-8")
+    if args.worth_release is not None:
+        previous = file_at(args.worth_release) if args.worth_release else ""
+        sys.stdout.write("yes\n" if worth_release(text, previous) else "no\n")
+        return 0
     body = notes_for_tag(text, args.tag) if args.tag else notes_since(text, file_at(args.since) if args.since else "")
     sys.stdout.write(f"{body}\n\n{INSTALL}\n")
     return 0
