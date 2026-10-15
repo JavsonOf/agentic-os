@@ -1176,6 +1176,7 @@ function loadMe() {
   note.classList.toggle("hidden", supported && Notification.permission !== "denied");
   note.textContent = !supported ? (isApp() ? "Niedostępne w aplikacji – otwórz War Room w Chrome" : "Ta przeglądarka nie obsługuje powiadomień")
     : "Zablokowane w ustawieniach przeglądarki";
+  $("#notify-desc").classList.toggle("hidden", !note.classList.contains("hidden"));
   refreshAgents().then(() => { if (state.tab === "me") { const b = agentInfo(); $("#me-permission-value").textContent = b.kind !== "external" ? PERM_SHORT[b.permission] || "Autonomiczny" : "zewnętrzny"; $("#me-mode-value").textContent = b.kind !== "external" ? MODE_SHORT[b.mode] || "Standardowy" : "—"; $("#me-agents-value").textContent = String(state.agents.length); } }).catch(() => {});
 }
 $("#me-permission").addEventListener("click", () => {

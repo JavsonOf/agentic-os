@@ -443,6 +443,12 @@ pre.out { white-space: pre-wrap; word-break: break-word; background: var(--surfa
 .menu-icon svg { width: 20px; height: 20px; }
 .menu-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .menu-text small { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.menu-text b { font-size: 15.5px; }
+.group-card .menu-item { border-bottom: 1px solid var(--border); }
+.group-card .menu-item:last-child { border-bottom: 0; }
+.menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.menu-icon.gray { background: var(--surface-2); }
+.menu-item.danger b, .menu-item.danger .menu-icon { color: var(--err); }
 .card-link { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; }
 .back-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 2px; margin: 0 0 6px -4px; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
 .back-btn svg { width: 22px; height: 22px; }
