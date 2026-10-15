@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tags and history for the release notes
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -31,6 +33,12 @@ jobs:
         with:
           name: AgenticOS-apk
           path: AgenticOS.apk
+      - name: Release notes
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          previous=$(git tag --list 'android-*' --sort=-v:refname | head -n 1)
+          python3 scripts/release_notes.py --since "$previous" > release-notes.md
+          cat release-notes.md
       - name: Publish release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -39,6 +47,4 @@ jobs:
           name: Agentic OS for Android (build ${{ github.run_number }})
           make_latest: true
           files: AgenticOS.apk
-          body: |
-            Install on Android: open this page on your phone, tap **AgenticOS.apk**, then allow installing
-            from your browser when asked. Updates install over the previous version.
+          body_path: release-notes.md  # what changed, from CHANGELOG.md

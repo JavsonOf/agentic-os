@@ -72,6 +72,10 @@ paste keys into chat, do not put keys in environment files you commit, and never
   bump `CACHE` in `agentic_os/server/static/sw.js` so phones load the new version.
 - Make changes on a branch and open a pull request against `main`. Do not push straight to `main`.
 - Conventional commit messages: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`.
+- Describe every user-visible change in `CHANGELOG.md` under **Następne wydanie**, in Polish, in one of
+  the categories Dodano, Zmieniono, Usunięto, Naprawiono, Ulepszono. These lines become the GitHub release
+  notes automatically, so keep them general: what changed for the user, never keys, passwords, addresses,
+  internal paths or how a security problem could be exploited (say "Poprawiono bezpieczeństwo …" instead).
 
 ## Never
 
