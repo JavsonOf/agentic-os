@@ -1,7 +1,7 @@
 """Release versions, titles and notes for GitHub releases, taken from CHANGELOG.md.
 
 Releases follow SemVer: tag ``vMAJOR.MINOR.PATCH`` (now ``v0.MINOR.PATCH``) and title
-``vX.Y.Z — Obszar: krótki opis``. See "Wersje i nazwy wydań" in CHANGELOG.md.
+``vX.Y.Z – Short English Title``. See "Wersje i nazwy wydań" in CHANGELOG.md.
 
     python scripts/release_notes.py --tag v0.2.1             notes of a published release
     python scripts/release_notes.py --title v0.2.1           title of a published release
@@ -11,9 +11,9 @@ Releases follow SemVer: tag ``vMAJOR.MINOR.PATCH`` (now ``v0.MINOR.PATCH``) and 
     python scripts/release_notes.py --next-title v0.2.4      title of the next release
     python scripts/release_notes.py --migrations             "old-tag new-tag" pairs from "dawniej …" lines
 
-Published releases are sections "## vX.Y.Z — Obszar: opis" (a line below may say "dawniej android-N"
+Published releases are sections "## vX.Y.Z – Title" (a line below may say "dawniej android-N"
 for releases published before SemVer). Any other "## ..." heading (normally "Następne wydanie") holds
-changes that are not released yet, with optional "Tytuł: Obszar: opis" and "Wersja: major|minor|patch"
+changes that are not released yet, with optional "Tytuł: English title" and "Wersja: major|minor|patch"
 lines. Points are grouped by "### <category>"; points under "Drobne zmiany" never start a release.
 """
 
@@ -28,7 +28,7 @@ from pathlib import Path
 CATEGORIES = ("Dodano", "Zmieniono", "Usunięto", "Naprawiono", "Ulepszono", "Drobne zmiany")
 MINOR = "Drobne zmiany"
 VERSION = r"v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?"
-TAG_HEADING = re.compile(rf"^##\s+({VERSION})(?:\s+—\s+(.*))?$")
+TAG_HEADING = re.compile(rf"^##\s+({VERSION})(?:\s+[–—-]\s+(.*))?$")
 OLD_TAG = re.compile(r"dawniej\s+(android-\d+)")
 TITLE_LINE = re.compile(r"^Tytuł:\s*(.+)$")
 BUMP_LINE = re.compile(r"^Wersja:\s*(major|minor|patch)\s*$")
@@ -118,15 +118,14 @@ def _line_value(pattern: re.Pattern[str], text: str) -> str:
 
 
 def next_title(text: str, previous_text: str) -> str:
-    """The "Tytuł:" line when it was written for this release, else one made from the first new point."""
+    """The English "Tytuł:" line when it was written for this release, else a generic English title."""
     title = _line_value(TITLE_LINE, text)
     if title and title != _line_value(TITLE_LINE, previous_text):
         return title
-    points = [p for c, p in new_points(text, previous_text) if c != MINOR] or [p for _, p in new_points(text, previous_text)]
-    if not points:
-        return "Poprawki: Drobne poprawki i aktualizacje"
-    first = re.split(r"(?<=[.!?:])\s", points[0], maxsplit=1)[0].rstrip(".:")
-    return "Zmiany: " + (first if len(first) <= 70 else first[:67].rstrip() + "…")
+    categories = {c for c, _ in new_points(text, previous_text)}
+    if "Dodano" in categories:
+        return "New Features & Improvements"
+    return "Fixes & Improvements" if categories - {MINOR} else "Minor Updates"
 
 
 def next_version(text: str, previous_text: str, tags: list[str]) -> str:

@@ -33,7 +33,7 @@ jobs:
         id: notes
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |
-          # SemVer from CHANGELOG.md: vX.Y.Z — Obszar: opis (see "Wersje i nazwy wydań" there)
+          # SemVer from CHANGELOG.md: vX.Y.Z – English title (see "Wersje i nazwy wydań" there)
           previous=$(git tag --list 'v*' 'android-*' --sort=-creatordate | head -n 1)
           version=$(python3 scripts/release_notes.py --next-version "$previous")
           title=$(python3 scripts/release_notes.py --next-title "$previous")
@@ -44,10 +44,10 @@ jobs:
           {
             echo "publish=$worth"
             echo "version=$version"
-            echo "name=$version — $title"
+            echo "name=$version – $title"
           } >> "$GITHUB_OUTPUT"
           echo "APP_VERSION=${version#v}" >> "$GITHUB_ENV"
-          echo "Previous: ${previous:-none} · next: $version — $title · publish: $worth"
+          echo "Previous: ${previous:-none} · next: $version – $title · publish: $worth"
           cat release-notes.md
       - name: Build APK
         run: gradle -p android --no-daemon assembleRelease testReleaseUnitTest

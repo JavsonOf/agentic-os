@@ -11,8 +11,9 @@ mogłyby komuś pomóc w ataku.
 - **MAJOR** (`v0.x.x` → `v1.0.0`): pierwsze stabilne wydanie albo zmiana, która psuje zgodność z poprzednią wersją.
 - **MINOR** (`v0.2.0` → `v0.3.0`): nowe funkcje, ekrany i integracje, czyli punkty w kategorii **Dodano**.
 - **PATCH** (`v0.2.0` → `v0.2.1`): poprawki błędów, ulepszenia, zmiany w automatyzacji i dokumentacji.
-- Tytuł wydania: `vX.Y.Z — Obszar: krótki opis najważniejszej zmiany po polsku`, np.
-  `v0.2.1 — Android: Czytelne komunikaty błędów`. Bez „Agentic OS”, „wydanie” i tłumaczenia.
+- Tytuł wydania jest po angielsku, bo repozytorium jest publiczne: `vX.Y.Z – Krótki opis najważniejszej zmiany`,
+  np. `v0.2.1 – Clear Connection Errors in the Android App`. Bez „Agentic OS” i „Release”. Opisy zmian
+  zostają po polsku.
 - Wersje testowe, gdyby były potrzebne: `v0.3.0-beta.1`, `v1.0.0-rc.1`.
 
 ## Jak dopisywać zmiany
@@ -23,35 +24,35 @@ w poprzednim. Drobiazgi, dla których nie warto wydawać nowej wersji (literówk
 w kodzie, dokumentacja), wpisuj w kategorii **Drobne zmiany**: zostają zapisane i pojawią się w opisie
 najbliższego prawdziwego wydania. Nowa wersja aplikacji na Androida zawsze dostaje wydanie.
 
-W linii `Tytuł:` wpisz obszar i krótki opis najważniejszej zmiany. Numer wersji automat wylicza sam
+W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title Case, np. „QR Code Pairing”). Numer wersji automat wylicza sam
 (MINOR, gdy jest coś w Dodano, inaczej PATCH). Linia `Wersja: major` albo `Wersja: minor` wymusza inny skok.
 
 ## Następne wydanie
 
-Tytuł: Wydania: Numery wersji v0.X.Y i czytelne tytuły
+Tytuł: Semantic Versioning & Readable Release Titles
 
 ### Zmieniono
-- Wydania mają numery wersji w formacie v0.X.Y i tytuły z obszarem i krótkim opisem zmiany, np. „v0.2.1 — Android: Czytelne komunikaty błędów”. Wcześniejsze wydania dostały nowe numery i nazwy według tej samej zasady.
+- Wydania mają numery wersji w formacie v0.X.Y i krótkie angielskie tytuły, np. „v0.2.1 – Clear Connection Errors in the Android App”. Wcześniejsze wydania dostały nowe numery i nazwy według tej samej zasady.
 
-## v0.2.4 — Wydania: Nazwy wydań po polsku i angielsku
+## v0.2.4 – Bilingual Release Names
 _15.10.2026 · dawniej android-16_
 
 ### Zmieniono
 - Nazwy wydań na GitHubie są teraz po polsku i angielsku, np. „Agentic OS – wydanie 14 · Release 14”.
 
-## v0.2.3 — Wydania: Nowe wydanie po każdej ważnej zmianie
+## v0.2.3 – A Release for Every Important Change
 _15.10.2026 · dawniej android-14_
 
 ### Zmieniono
 - Nowe wydanie powstaje po każdej ważnej zmianie w Agentic OS, a nie tylko po zmianach w aplikacji na Androida. Drobiazgi trafiają do opisu najbliższego wydania zamiast tworzyć osobne.
 
-## v0.2.2 — Wydania: Opisy zmian po polsku
+## v0.2.2 – Release Notes in Polish
 _15.10.2026 · dawniej android-11_
 
 ### Dodano
 - Każde wydanie na GitHubie ma teraz opis po polsku: co dodano, co zmieniono, co usunięto, jakie błędy naprawiono i co ulepszono.
 
-## v0.2.1 — Android: Czytelne komunikaty błędów
+## v0.2.1 – Clear Connection Errors in the Android App
 _15.10.2026 · dawniej android-9_
 
 ### Ulepszono
@@ -63,7 +64,7 @@ _15.10.2026 · dawniej android-9_
 - Aplikacja rozpoznaje, gdy serwer w chmurze jest uśpiony lub wyłączony, i mówi o tym zamiast pokazywać pustą stronę.
 - Adres zapisany w starszej wersji, który nie może działać, nie blokuje już aplikacji: przy starcie pojawia się prośba o poprawny.
 
-## v0.2.0 — War Room: Nowy wygląd, zadania cykliczne i pliki w Wiedzy
+## v0.2.0 – Redesigned War Room, Recurring Tasks & Knowledge Files
 _15.10.2026 · dawniej android-8_
 
 ### Dodano
@@ -92,7 +93,7 @@ _15.10.2026 · dawniej android-8_
 - Błędny komunikat „Failed to fetch” w czacie, gdy odpowiedź była już gotowa w Zadaniach.
 - Nieczytelny tekst złożony z powtórzonych słów „null” w szczegółach zadania.
 
-## v0.1.0 — Start: Pierwsze wydanie Agentic OS i aplikacji na Androida
+## v0.1.0 – First Release of Agentic OS & the Android App
 _15.10.2026 · dawniej android-2_
 
 ### Dodano
