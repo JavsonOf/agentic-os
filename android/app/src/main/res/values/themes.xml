@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
-        <item name="android:colorPrimary">#0b1020</item>
-        <item name="android:colorAccent">#6ea8ff</item>
-        <item name="android:statusBarColor">#0b1020</item>
-        <item name="android:navigationBarColor">#0b1020</item>
-        <item name="android:windowBackground">#0b1020</item>
+    <!-- Light by default; values-night/themes.xml takes over in dark mode. The WebView reads this theme to
+         answer the War Room's prefers-color-scheme, which drives its "Systemowy" (system) theme. -->
+    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#f5f6f4</item>
+        <item name="android:colorAccent">#0f766e</item>
+        <item name="android:statusBarColor">#ffffff</item>
+        <item name="android:navigationBarColor">#1a1d1c</item>  <!-- light nav-bar icons need API 27; a dark bar is readable on every version -->
+        <item name="android:windowBackground">#f5f6f4</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

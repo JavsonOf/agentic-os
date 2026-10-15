@@ -150,6 +150,35 @@ $("#login-form").addEventListener("submit", async (e) => {
   } catch (err) { $("#login-error").textContent = "Nieprawidłowe hasło."; }
 });
 
+/* ------------------------------------------------------------------ theme */
+const THEMES = { light: "Jasny", dark: "Ciemny", system: "Systemowy" };
+const THEME_ICONS = {
+  light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  dark: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  system: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',
+};
+function currentTheme() { const t = store.get("aos_theme", "system"); return THEMES[t] ? t : "system"; }
+function applyTheme(mode) {
+  if (mode === "system") { delete document.documentElement.dataset.theme; store.del("aos_theme"); }
+  else { document.documentElement.dataset.theme = mode; store.set("aos_theme", mode); }
+  const btn = $("#theme-btn");
+  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">${THEME_ICONS[mode]}</svg>`;
+  btn.setAttribute("aria-label", `Motyw: ${THEMES[mode]}. Kliknij, aby zmienić.`);
+  btn.title = `Motyw: ${THEMES[mode]}`;
+  const radio = document.querySelector(`#theme-choice input[value="${mode}"]`);
+  if (radio) radio.checked = true;
+  if (state.tab === "brain" && brain.nodes.length) simulate(300); // the graph is drawn with theme colours
+}
+$("#theme-btn").addEventListener("click", () => {
+  // From "system" jump to the opposite of what is showing, so the first tap always changes something.
+  const mode = currentTheme();
+  const showingDark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const next = mode === "system" ? (showingDark ? "light" : "dark") : mode === "light" ? "dark" : "system";
+  applyTheme(next); toast(`Motyw: ${THEMES[next]}`);
+});
+$("#theme-choice").addEventListener("change", (e) => applyTheme(e.target.value));
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (state.tab === "brain" && brain.nodes.length) simulate(300); });
+
 /* ------------------------------------------------------------------- tabs */
 function showTab(name) {
   state.tab = name;
@@ -440,7 +469,7 @@ function simulate(iter) {
   for (const n of N) {
     const [color] = KIND[n.kind] || ["#9aa5c4"]; const r = n.kind === "document" ? 9 : 6;
     ctx.fillStyle = color; ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill();
-    if (brain.sel === n) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1; }
+    if (brain.sel === n) { ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--text"); ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1; }
     if (n.kind === "document") { ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--text"); ctx.font = "12px system-ui"; ctx.textAlign = "center"; ctx.fillText(n.label, n.x, n.y - 13); }
   }
   if (iter < 300 && state.tab === "brain") brain.raf = requestAnimationFrame(() => simulate(iter + 1));
@@ -690,3 +719,4 @@ $("#mem-import").addEventListener("click", async (ev) => {
   } catch (err) { $("#mem-result").textContent = "❌ " + err.message; } finally { ev.target.disabled = false; }
 });
 $("#mem-file").addEventListener("change", (e) => { const f = e.target.files[0]; $("#mem-result").textContent = f ? `Wybrano: ${f.name} (${(f.size / 1024 / 1024).toFixed(1)} MB)` : ""; });
+applyTheme(currentTheme());

@@ -5,6 +5,7 @@ import threading
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 
@@ -320,3 +321,17 @@ def test_provider_model_list_uses_the_right_endpoint_and_filters(tmp_path, monke
     assert seen[-1] == ("http://127.0.0.1:9/v1/models", {})
     reg.models("claude")
     assert seen[-1][0] == "https://api.anthropic.com/v1/models?limit=100" and seen[-1][1]["x-api-key"] == "a-key"
+
+
+def test_war_room_offers_light_dark_and_system_themes():
+    static = Path(__file__).resolve().parent.parent / "agentic_os" / "server" / "static"
+    css = (static / "app.css").read_text(encoding="utf-8")
+    html = (static / "index.html").read_text(encoding="utf-8")
+    # "Systemowy" follows the OS, the two others force a palette regardless of it.
+    assert "@media (prefers-color-scheme: dark)" in css and ':root:not([data-theme="light"])' in css
+    assert ':root[data-theme="dark"]' in css
+    assert 'id="theme-btn"' in html
+    for value in ("light", "dark", "system"):
+        assert f'name="theme" value="{value}"' in html
+    # the saved choice is applied in <head>, before the first paint
+    assert html.index('localStorage.getItem("aos_theme")') < html.index("<body>")

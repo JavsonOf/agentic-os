@@ -5,7 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Agentic OS</title>
   <meta name="description" content="Agentic OS War Room: Twoi agenci AI w jednym miejscu.">
-  <meta name="theme-color" content="#0b1020">
+  <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111413" media="(prefers-color-scheme: dark)">
+  <script>
+    /* Apply the saved theme before the first paint so the page never flashes the other one. */
+    try { var t = localStorage.getItem("aos_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) { /* storage blocked */ }
+  </script>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-192.png">
@@ -27,20 +32,21 @@
 
   <div id="app" class="app hidden">
     <header class="topbar">
-      <div class="brand"><img src="/icon.svg" alt="" width="28" height="28"><span>Agentic OS</span></div>
+      <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 8l8 8M16 8l-8 8"/></svg></span><span>Agentic OS</span></div>
       <div id="model-badge" class="badge" title="Domyślny model"></div>
       <button id="install-btn" class="btn small hidden" type="button">Zainstaluj</button>
+      <button id="theme-btn" class="icon-btn" type="button" aria-label="Motyw"></button>
     </header>
 
     <nav class="tabs" aria-label="Sekcje">
-      <button data-tab="chat" class="tab active">💬<span>Czat</span></button>
-      <button data-tab="agents" class="tab">🤖<span>Agenci</span></button>
-      <button data-tab="tasks" class="tab">📋<span>Zadania</span></button>
-      <button data-tab="brain" class="tab">🧠<span>Mózg</span></button>
-      <button data-tab="knowledge" class="tab">📚<span>Wiedza</span></button>
-      <button data-tab="ext" class="tab">🧩<span>Rozszerz.</span></button>
-      <button data-tab="models" class="tab">🔑<span>Modele</span></button>
-      <button data-tab="monitor" class="tab">📊<span>Monitoring</span></button>
+      <button data-tab="chat" class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><span>Czat</span></button>
+      <button data-tab="agents" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4M9.5 12h.01M14.5 12h.01"/></svg><span>Agenci</span></button>
+      <button data-tab="tasks" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Zadania</span></button>
+      <button data-tab="brain" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><path d="M8 12h2M13.7 10.8l2.6-3.6M13.7 13.2l2.6 3.6"/></svg><span>Mózg</span></button>
+      <button data-tab="knowledge" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg><span>Wiedza</span></button>
+      <button data-tab="ext" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4V4z"/></svg><span>Dodatki</span></button>
+      <button data-tab="models" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/></svg><span>Modele</span></button>
+      <button data-tab="monitor" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Monitor</span></button>
     </nav>
 
     <div id="approvals" class="approvals hidden" aria-live="assertive"></div>
@@ -60,7 +66,7 @@
         <div id="chat-log" class="chat-log" aria-live="polite"></div>
         <form id="chat-form" class="chat-input">
           <textarea id="chat-text" rows="1" placeholder="Napisz do agenta…" required></textarea>
-          <button class="btn primary" type="submit" aria-label="Wyślij">➤</button>
+          <button class="btn primary send-btn" type="submit" aria-label="Wyślij"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
         </form>
       </section>
 
@@ -264,6 +270,16 @@
             <button class="btn primary" type="submit">Zapisz</button>
           </form>
         </details>
+        <section class="card stack" aria-labelledby="look-title">
+          <h3 id="look-title">Wygląd</h3>
+          <fieldset class="segmented" id="theme-choice">
+            <legend class="sr-only">Motyw</legend>
+            <label><input type="radio" name="theme" value="light">Jasny</label>
+            <label><input type="radio" name="theme" value="dark">Ciemny</label>
+            <label><input type="radio" name="theme" value="system">Systemowy</label>
+          </fieldset>
+          <p class="muted small">„Systemowy” przełącza się razem z ustawieniem telefonu lub komputera.</p>
+        </section>
       </section>
 
       <!-- MONITORING -->
