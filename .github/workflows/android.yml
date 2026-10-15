@@ -44,6 +44,8 @@ jobs:
           worth=$(python3 scripts/release_notes.py --worth-release "$previous")
           # A new app build means changed app code; docs such as android/README.md do not count.
           if [ -z "$previous" ] || ! git diff --quiet "$previous" HEAD -- android ':(exclude)android/*.md'; then worth=yes; fi
+          # "Wersja: build" always publishes its rebuild (v0.2.6+build.1).
+          if [[ "$version" == *+* ]]; then worth=yes; fi
           # Dropping "Wersja: beta" after test builds publishes the stable release.
           if [[ "$previous" == *-* && "$version" != *-* ]]; then worth=yes; fi
           prerelease=false

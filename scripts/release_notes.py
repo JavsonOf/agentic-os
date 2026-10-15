@@ -15,7 +15,9 @@ Releases follow SemVer: tag ``vMAJOR.MINOR.PATCH`` (now ``v0.MINOR.PATCH``) and 
 Published releases are sections "## vX.Y.Z – Title" (a line below may say "dawniej android-N"
 for releases published before SemVer). Any other "## ..." heading (normally "Następne wydanie") holds
 changes that are not released yet, with optional "Tytuł: English title" and "Wersja: major|minor|patch"
-lines ("Wersja: beta", "Wersja: major rc" etc. publish a test build such as v0.3.0-beta.1 instead). Points are grouped by "### <category>"; points under "Drobne zmiany" never start a release.
+lines ("Wersja: beta", "Wersja: major rc" etc. publish a test build such as v0.3.0-beta.1 instead;
+"Wersja: build" rebuilds the newest version as v0.2.6+build.1). A release section may carry a "> Uwaga: ..." line,
+shown as a note on the release page. Points are grouped by "### <category>"; points under "Drobne zmiany" never start a release.
 """
 
 from __future__ import annotations
@@ -28,19 +30,19 @@ from pathlib import Path
 
 CATEGORIES = ("Dodano", "Zmieniono", "Usunięto", "Naprawiono", "Ulepszono", "Drobne zmiany")
 MINOR = "Drobne zmiany"
-VERSION = r"v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?"
+VERSION = r"v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?(?:\+([0-9A-Za-z.]+))?"
 TAG_HEADING = re.compile(rf"^##\s+({VERSION})(?:\s+[–—-]\s+(.*))?$")
 OLD_TAG = re.compile(r"dawniej\s+(android-\d+)")
 TITLE_LINE = re.compile(r"^Tytuł:\s*(.+)$")
 PHASES = ("alpha", "beta", "rc")
-BUMP_LINE = re.compile(r"^Wersja:\s*((?:major|minor|patch)?\s*(?:alpha|beta|rc)?)\s*$")
+BUMP_LINE = re.compile(r"^Wersja:\s*((?:major|minor|patch)?\s*(?:alpha|beta|rc)?|build)\s*$")
 INSTALL = ("---\n**Instalacja na Androidzie:** otwórz tę stronę na telefonie, dotknij **{apk}** i zezwól "
            "przeglądarce na instalację, gdy zapyta. Nowa wersja instaluje się na poprzedniej.")
 
 
 def apk_name(tag: str) -> str:
     """File name of the release's APK asset, e.g. AgenticOS_v0.2.1.apk."""
-    return f"AgenticOS_{tag}.apk"
+    return f"AgenticOS_{tag.replace('+', '_')}.apk"  # "+" breaks downloads on some phones
 
 
 def install(tag: str) -> str:
@@ -67,12 +69,14 @@ def parse(text: str) -> list[tuple[str | None, str, str]]:
 
 
 def releases(text: str) -> list[dict[str, str]]:
-    """Published releases in file order: tag, title and the pre-SemVer tag they replace."""
+    """Published releases in file order: tag, title, the pre-SemVer tag they replace and a "> Uwaga:" note."""
     found: list[dict[str, str]] = []
     for line in text.splitlines():
         m = TAG_HEADING.match(line)
         if m:
-            found.append({"tag": m.group(1), "title": (m.group(6) or "").strip(), "old": ""})
+            found.append({"tag": m.group(1), "title": (m.group(7) or "").strip(), "old": "", "note": ""})
+        elif found and line.startswith("> Uwaga:"):
+            found[-1]["note"] = line[len("> Uwaga:"):].strip()
         elif found and not found[-1]["old"] and (old := OLD_TAG.search(line)):
             found[-1]["old"] = old.group(1)
     return found
@@ -117,6 +121,15 @@ def old_version_note(text: str, tag: str) -> str:
             f"zbudowania aplikacji od nowa. To ten sam plik co wcześniej, zmieniła się tylko nazwa wydania.")
 
 
+def release_note(text: str, tag: str) -> str:
+    """The section's own "> Uwaga:" line, then the pre-SemVer note, as quoted notes for the release page."""
+    own = next((r["note"] for r in releases(text) if r["tag"] == tag), "")
+    notes = [f"> **Uwaga:** {own}"] if own else []
+    if old := old_version_note(text, tag):
+        notes.append(old)
+    return "\n\n".join(notes)
+
+
 def title_for_tag(text: str, tag: str) -> str:
     return next((r["title"] for r in releases(text) if r["tag"] == tag), "")
 
@@ -156,12 +169,17 @@ def next_version(text: str, previous_text: str, tags: list[str]) -> str:
 
     "Wersja: alpha|beta|rc" (optionally after the bump, e.g. "Wersja: major rc") makes a test build of the
     next version: v0.3.0-beta.1, then -beta.2, ... Without it, the stable release keeps the tested number.
+    "Wersja: build" rebuilds the newest stable version without changing it: v0.2.6+build.1, +build.2, ...
     """
     all_tags = tags + [r["tag"] for r in releases(text)]
     stable = [v for v in (parse_version(t) for t in all_tags if "-" not in t) if v]
     major, minor, patch = max(stable, default=(0, 0, 0))
     line = _line_value(BUMP_LINE, text)
     words = line.split() if line != _line_value(BUMP_LINE, previous_text) else []
+    if "build" in words and stable:
+        base = f"v{major}.{minor}.{patch}"
+        builds = [int(m.group(1)) for t in all_tags if (m := re.fullmatch(rf"{re.escape(base)}\+build\.(\d+)", t))]
+        return f"{base}+build.{max(builds, default=0) + 1}"
     phase = next((w for w in words if w in PHASES), "")
     bump = next((w for w in words if w not in PHASES), "")
     if not bump:
@@ -218,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(title_for_tag(text, args.title) + "\n")
         return 0
     if args.tag:
-        note = old_version_note(text, args.tag)
+        note = release_note(text, args.tag)
         sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{install(args.tag)}\n")
         return 0
     previous_ref = next(v for v in (args.since, args.worth_release, args.next_version, args.next_title) if v is not None)

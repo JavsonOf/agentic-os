@@ -14,6 +14,8 @@ mogłyby komuś pomóc w ataku.
 - Tytuł wydania jest po angielsku, bo repozytorium jest publiczne: `vX.Y.Z – Krótki opis najważniejszej zmiany`,
   np. `v0.2.1 – Clear Connection Errors in the Android App`. Bez „Agentic OS” i „Release”. Opisy zmian
   zostają po polsku.
+- Ponowne zbudowanie tej samej wersji, bez zmian w aplikacji, dostaje metadane po plusie: `v0.2.6+build.1`
+  (plik `AgenticOS_v0.2.6_build.1.apk`). Numer wersji zostaje ten sam, a dopisek mówi, że to techniczna kompilacja.
 - Wersje testowe (np. żeby sprawdzić, czy nowy plik APK się instaluje) mają przyrostek po numerze:
   `v0.3.0-alpha.1` (wczesna próba), `v0.3.0-beta.1` (funkcje gotowe, szukanie błędów), `v1.0.0-rc.1`
   (kandydat na wydanie: jeśli nie ma błędów, staje się `v1.0.0`). Są oznaczone na GitHubie jako
@@ -32,15 +34,21 @@ W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title 
 gdy ten automatyczny skok jest za mały. Dla wersji testowej dopisz w tej samej linii `alpha`, `beta` albo `rc`.
 Linia `Wersja: alpha`, `Wersja: beta` albo `Wersja: rc` robi z wydania wersję testową następnego numeru
 (`v0.3.0-beta.1`, przy kolejnym scaleniu `v0.3.0-beta.2`), a `Wersja: major rc` daje `v1.0.0-rc.1`. Gdy usuniesz
-tę linię, następne scalenie wyda wersję stabilną z tym samym numerem (`v0.3.0`).
+tę linię, następne scalenie wyda wersję stabilną z tym samym numerem (`v0.3.0`). Linia `Wersja: build` od razu
+buduje ostatnią wersję od nowa jako `v0.2.6+build.1`.
+
+Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi się w opisie tego wydania na GitHubie.
 
 ## Następne wydanie
 
 ### Drobne zmiany
 - Zmiana samej instrukcji aplikacji na Androida nie tworzy już nowego wydania.
+- Ponowne zbudowanie tej samej wersji dostaje dopisek po plusie, np. v0.2.6+build.1, a wydanie może mieć w opisie własną uwagę.
 
 ## v0.2.6 – Versioned APK File Names & Test Builds
 _15.10.2026_
+
+> Uwaga: To wydanie powstało automatycznie po zmianach w automatyzacji wydań i w instrukcji instalacji. Aplikacja jest taka sama jak w v0.2.5, zmienił się tylko numer wersji pokazywany w ustawieniach Androida i nazwa pliku. Nie musisz jej aktualizować.
 
 ### Zmieniono
 - Plik aplikacji w każdym wydaniu ma w nazwie numer wersji, np. AgenticOS_v0.2.6.apk. W starszych wydaniach zmieniła się tylko nazwa pliku, sam plik jest ten sam.

@@ -94,6 +94,9 @@ paste keys into chat, do not put keys in environment files you commit, and never
 - Test builds: `Wersja: alpha`, `beta` or `rc` (or e.g. `Wersja: major rc`) publishes a GitHub pre-release
   such as `v0.3.0-beta.1`, `-beta.2` on the next merge, never marked "Latest". Remove the line to publish the
   stable release, which keeps the tested number (`v0.3.0`).
+- Rebuilds of the same code (no app change, e.g. a re-run): `Wersja: build` publishes `v0.2.6+build.1` (SemVer
+  build metadata, APK `AgenticOS_v0.2.6_build.1.apk`); the version number itself stays. A `> Uwaga: …` line
+  under a release heading in `CHANGELOG.md` is shown as a note on that release.
 - The android workflow computes the version and publishes the release; `release-notes` keeps older releases
   in line with `CHANGELOG.md`. The APK asset is named `AgenticOS_vX.Y.Z.apk`.
 
