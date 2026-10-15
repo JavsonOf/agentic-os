@@ -28,6 +28,12 @@ function toast(msg, isErr = false) {
   t.textContent = msg; t.classList.toggle("err", isErr); t.classList.add("show");
   clearTimeout(state.timers.toast); state.timers.toast = setTimeout(() => t.classList.remove("show"), 3200);
 }
+/* explainError() lives in errors.js: one place that turns every known error into plain Polish. */
+function errorView(msg) {
+  const hint = explainError(msg) || (msg ? "⚠️ Coś poszło nie tak. Spróbuj ponownie." : "⚠️ Nieznany błąd.");
+  if (!msg) return [el("p", { text: hint })];
+  return [el("p", { text: hint }), el("details", {}, el("summary", { text: "Szczegóły" }), el("pre", { text: String(msg) }))];
+}
 /* Safe rich text: escape everything, then allow **bold** and `code` only. */
 function richText(text) {
   const frag = document.createDocumentFragment();
@@ -90,7 +96,10 @@ async function api(path, { method = "GET", body } = {}) {
   let data = null;
   try { data = await res.json(); } catch { data = null; }
   if (res.status === 401) { showLogin(); throw new Error("Wymagane logowanie"); }
-  if (!res.ok) throw Object.assign(new Error((data && data.error) || `Błąd ${res.status}`), { status: res.status });
+  if (!res.ok) {
+    const raw = (data && data.error) || `Błąd ${res.status}`;
+    throw Object.assign(new Error(explainError(raw) || raw), { status: res.status, raw });
+  }
   return data;
 }
 /* Sleep that ends early when the phone comes back online or the tab becomes visible again. */
@@ -187,7 +196,7 @@ function addMsg(role, text) {
 }
 function renderAgentReply(node, proc) {
   node.classList.remove("thinking"); node.replaceChildren();
-  if (proc.status === "failed") { node.append(richText("⚠️ " + (proc.error || "Błąd"))); return; }
+  if (proc.status === "failed") { node.append(...errorView(proc.error)); return; }
   const r = proc.result || {};
   node.append(richText(r.output || "(brak odpowiedzi)"));
   if (r.reflection) {
@@ -366,14 +375,14 @@ async function openTask(pid) {
   try {
     const p = await waitForProcess(pid, (cur) => box.replaceChildren(el("p", { class: "muted", text: `Status: ${cur.status}…` })));
     const r = p.result || {};
-    box.replaceChildren(
+    box.replaceChildren(...[
       el("div", { class: "item-head" }, el("h3", { text: p.task.slice(0, 160) }), statusTag(p.status)),
-      el("pre", { class: "out", text: p.error || r.output || JSON.stringify(r, null, 2) }),
+      ...(p.error ? errorView(p.error) : [el("pre", { class: "out", text: r.output || JSON.stringify(r, null, 2) })]),
       r.reflection ? el("details", {}, el("summary", { text: `🔁 Samoocena: ${Math.round(r.reflection.best_score * 100)}% (próby: ${r.reflection.attempts.length})` }), ...r.reflection.attempts.map((a, i) => el("pre", { class: "out", text: `Próba ${i + 1}: ${Math.round(a.score * 100)}%${a.critique ? "\n" + a.critique : ""}` }))) : null,
       r.strategy ? el("p", { class: "muted small", text: `🎯 Styl: ${STRATEGIES[r.strategy] || r.strategy}` }) : null,
       r.transcript ? el("details", {}, el("summary", { text: `Przebieg pracy zespołu (${r.transcript.length})` }), ...r.transcript.map((t) => el("pre", { class: "out", text: `${t.agent}: ${t.output || ""}` }))) : null,
       r.tool_calls && r.tool_calls.length ? el("details", {}, el("summary", { text: "Narzędzia" }), ...r.tool_calls.map((c) => el("pre", { class: "out", text: `${c.tool}(${JSON.stringify(c.arguments)}) → ${c.result}` }))) : null,
-    );
+    ].filter(Boolean)); // replaceChildren() would print a skipped (null) section as the text "null"
     box.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (err) { box.replaceChildren(el("p", { class: "error", text: err.message })); }
 }
@@ -481,6 +490,7 @@ async function loadModels() {
         ev.target.disabled = true;
         try { const r = await api(`/providers/${p.id}/test`, { method: "POST", body: {} }); toast(`✅ Działa (${r.model}): ${r.reply}`); } catch (err) { toast("❌ " + err.message, true); } finally { ev.target.disabled = false; }
       } }),
+      el("button", { class: "btn small", type: "button", text: "📋 Wybierz model", onclick: (ev) => pickModel(p, data.default, ev.target) }),
       el("button", { class: "btn small", type: "button", text: "Ustaw domyślny", onclick: async () => {
         try { await api("/settings/default", { method: "POST", body: { provider: p.id, model: p.default_model || undefined } }); toast("Ustawiono ✅"); loadModels(); } catch (err) { toast(err.message, true); }
       } }),
@@ -494,6 +504,24 @@ async function loadModels() {
     sel.replaceChildren(...data.presets.map((p, i) => el("option", { value: String(i), text: p.label })));
     fillProviderForm(data.presets[0], true);
   }
+}
+/* Lists the models this key can really use, so nobody has to guess (and mistype) a model name. */
+async function pickModel(p, current, button) {
+  const item = button.closest(".item");
+  item.querySelector(".model-pick")?.remove();
+  button.disabled = true;
+  let models;
+  try { ({ models } = await api(`/providers/${p.id}/models`)); } catch (err) { toast("❌ " + err.message, true); return; } finally { button.disabled = false; }
+  if (!models.length) { toast("Dostawca nie zwrócił listy modeli – wpisz nazwę ręcznie w „Edytuj”.", true); return; }
+  const sel = el("select", { "aria-label": "Model" }, ...models.map((m) => el("option", { value: m, text: m, selected: m === p.default_model })));
+  const save = el("button", { class: "btn small primary", type: "button", text: "Zapisz", onclick: async () => {
+    try {
+      await api("/providers", { method: "POST", body: { id: p.id, kind: p.kind, base_url: p.base_url, label: p.label, default_model: sel.value,
+        make_default: current.provider === p.id } });
+      toast(`Model: ${sel.value} ✅`); loadModels();
+    } catch (err) { toast(err.message, true); }
+  } });
+  item.append(el("div", { class: "model-pick actions" }, el("span", { class: "muted small", text: `Dostępne modele (${models.length}):` }), sel, save));
 }
 function fillProviderForm(p, isPreset = false) {
   const f = $("#provider-form");

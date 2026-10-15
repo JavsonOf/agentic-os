@@ -121,7 +121,7 @@ class _FakeResponse:
         return self.body
 
 
-def _http_error(code, headers=None):
+def _http_error(code, headers=None, body=b'{"error": "busy"}'):
     import io
     import urllib.error
     from email.message import Message as Headers
@@ -129,7 +129,7 @@ def _http_error(code, headers=None):
     hdrs = Headers()
     for key, value in (headers or {}).items():
         hdrs[key] = value
-    return urllib.error.HTTPError("https://x/chat/completions", code, "err", hdrs, io.BytesIO(b'{"error": "busy"}'))
+    return urllib.error.HTTPError("https://x/chat/completions", code, "err", hdrs, io.BytesIO(body))
 
 
 def test_post_json_retries_temporary_overload(monkeypatch):
@@ -178,3 +178,31 @@ def test_post_json_gives_up_after_retries_and_skips_client_errors(monkeypatch):
     with pytest.raises(LLMError, match="HTTP 401"):
         openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
     assert calls == [401]
+
+
+def test_post_json_does_not_retry_a_long_quota_wait(monkeypatch):
+    import urllib.request
+
+    import pytest
+
+    from agentic_os.llm import LLMError, openai_compat
+
+    calls, sleeps = [], []
+    daily = b'{"error": {"code": 429, "message": "Quota exceeded. Please retry in 7h15m49.65s.", "status": "RESOURCE_EXHAUSTED"}}'
+    per_minute = b'{"error": {"code": 429, "details": [{"retryDelay": "3s"}]}}'
+
+    def fake_urlopen(request, timeout):
+        calls.append(1)
+        raise _http_error(429, body=daily if len(calls) == 1 else per_minute)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(openai_compat.time, "sleep", sleeps.append)
+    with pytest.raises(LLMError, match="RESOURCE_EXHAUSTED"):
+        openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
+    assert calls == [1] and sleeps == []
+
+    calls.clear()
+    calls.append(1)  # next replies carry Google's short retryDelay, which is honoured
+    with pytest.raises(LLMError, match="HTTP 429"):
+        openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
+    assert sleeps == [3.0, 3.0, 3.0]

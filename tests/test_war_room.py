@@ -296,3 +296,27 @@ def test_gemini_falls_back_to_openai_endpoint_without_sdk(monkeypatch):
     registry = ProviderRegistry()
     registry.upsert(ProviderConfig(id="gemini", kind="gemini", api_key="k"))
     assert isinstance(registry.build("gemini", "gemma-3-27b-it"), OpenAICompatProvider)
+
+
+def test_provider_model_list_uses_the_right_endpoint_and_filters(tmp_path, monkeypatch):
+    from agentic_os.llm import openai_compat
+
+    seen = []
+
+    def fake_get_json(url, headers, timeout=30.0):
+        seen.append((url, headers))
+        return {"data": [{"id": "models/gemini-3.8-flash"}, {"id": "models/text-embedding-004"},
+                         {"id": "models/gemini-3.8-flash-image"}, {"id": "gpt-x"}]}
+
+    monkeypatch.setattr(openai_compat, "get_json", fake_get_json)
+    reg = ProviderRegistry(str(tmp_path / "providers.json"))
+    reg.upsert(ProviderConfig("gemini", "gemini", api_key="g-key"))
+    reg.upsert(ProviderConfig("local", "openai_compat", base_url="http://127.0.0.1:9/v1/"))
+    reg.upsert(ProviderConfig("claude", "anthropic", api_key="a-key"))
+
+    assert reg.models("gemini") == ["gemini-3.8-flash"]
+    assert seen[-1] == ("https://generativelanguage.googleapis.com/v1beta/openai/models", {"Authorization": "Bearer g-key"})
+    assert reg.models("local") == ["gemini-3.8-flash", "gemini-3.8-flash-image", "gpt-x", "text-embedding-004"]
+    assert seen[-1] == ("http://127.0.0.1:9/v1/models", {})
+    reg.models("claude")
+    assert seen[-1][0] == "https://api.anthropic.com/v1/models?limit=100" and seen[-1][1]["x-api-key"] == "a-key"

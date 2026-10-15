@@ -135,3 +135,22 @@ class ProviderRegistry:
         from agentic_os.llm.openai_compat import OpenAICompatProvider
 
         return OpenAICompatProvider(model or "", base_url=cfg.base_url, api_key=cfg.api_key or None)
+
+    def models(self, provider_id: str) -> list[str]:
+        """Model ids the provider currently offers to this key, so users pick a real one instead of guessing."""
+        from agentic_os.llm.openai_compat import get_json
+
+        cfg = self.get(provider_id)
+        if cfg.kind == "anthropic":
+            base = (cfg.base_url or "https://api.anthropic.com").rstrip("/")
+            data = get_json(f"{base}/v1/models?limit=100", {"x-api-key": cfg.api_key, "anthropic-version": "2023-06-01"})
+        else:
+            if cfg.kind == "gemini":
+                from agentic_os.llm.gemini_provider import GEMINI_OPENAI_BASE_URL as base
+            else:
+                base = cfg.base_url.rstrip("/")
+            data = get_json(f"{base}/models", {"Authorization": f"Bearer {cfg.api_key}"} if cfg.api_key else {})
+        ids = [str(m.get("id", "")).removeprefix("models/") for m in data.get("data", []) if isinstance(m, dict)]
+        if cfg.kind == "gemini":  # the list also holds embedding, image and speech models that cannot chat
+            ids = [i for i in ids if i.startswith("gemini") and not re.search(r"embed|image|tts|audio|live", i)]
+        return sorted({i for i in ids if i})
