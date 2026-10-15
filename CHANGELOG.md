@@ -28,7 +28,8 @@ w kodzie, dokumentacja), wpisuj w kategorii **Drobne zmiany**: zostają zapisane
 najbliższego prawdziwego wydania. Nowa wersja aplikacji na Androida zawsze dostaje wydanie.
 
 W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title Case, np. „QR Code Pairing”). Numer wersji automat wylicza sam
-(MINOR, gdy jest coś w Dodano, inaczej PATCH). Linia `Wersja: major` albo `Wersja: minor` wymusza inny skok.
+(MINOR, gdy jest coś w Dodano, inaczej PATCH). Linię `Wersja: major` albo `Wersja: minor` dopisz tylko wtedy,
+gdy ten automatyczny skok jest za mały. Dla wersji testowej dopisz w tej samej linii `alpha`, `beta` albo `rc`.
 Linia `Wersja: alpha`, `Wersja: beta` albo `Wersja: rc` robi z wydania wersję testową następnego numeru
 (`v0.3.0-beta.1`, przy kolejnym scaleniu `v0.3.0-beta.2`), a `Wersja: major rc` daje `v1.0.0-rc.1`. Gdy usuniesz
 tę linię, następne scalenie wyda wersję stabilną z tym samym numerem (`v0.3.0`).
