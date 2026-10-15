@@ -17,6 +17,12 @@ GET      /processes                        process table
 GET      /processes/{pid}                  one process, with its result
 POST     /processes/{pid}/feedback         ``{reward, comment?}``, reward in [-1, 1]
 POST     /knowledge                        ``{text, metadata?}`` or ``{documents: [...]}``
+GET      /knowledge/search?q=              best matching fragments
+POST     /knowledge/upload?filename=       raw file (PDF, DOCX, TXT, MD, CSV, JSON; up to 60 MB) -> text in the knowledge base
+DELETE   /knowledge/{doc_id}               remove a document
+GET/POST /schedules                        recurring tasks ``{task, time: "HH:MM", agent?, days?, title?, enabled?}``
+POST     /schedules/{id}                   change ``{enabled?, time?, task?, ...}``; DELETE removes it
+POST     /schedules/{id}/run               run a scheduled task now
 POST     /goal                             ``{goal, agents?}`` -> plan + result
 GET      /traces/{trace_id}                spans for one agent run
 GET      /                                 War Room web app (PWA)
@@ -53,7 +59,9 @@ import hmac
 import json
 import os
 import re
+import time
 import urllib.parse
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -63,7 +71,9 @@ from agentic_os.llm.base import LLMError, Message
 from agentic_os.mcp import MCPError, config_from_dict
 from agentic_os.mods import mod_from_dict
 from agentic_os.providers import PRESETS, ProviderConfig
+from agentic_os.rag.extract import extract_text, file_type
 from agentic_os.rag.pipeline import Document
+from agentic_os.schedules import Schedule
 from agentic_os.skills import Skill, parse_skill_md
 
 MAX_BODY = 2 * 1024 * 1024
@@ -73,6 +83,7 @@ STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "application/javascript; charset=utf-8"),
+    "/qr.js": ("qr.js", "application/javascript; charset=utf-8"),
     "/errors.js": ("errors.js", "application/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
@@ -96,6 +107,23 @@ def _require(body: dict[str, Any], key: str, kind: type = str) -> Any:
     if not isinstance(value, kind) or (kind is str and not value.strip()):
         raise HTTPError(400, f"'{key}' is required and must be a {kind.__name__}")
     return value
+
+
+def _limit(value: Any) -> int:
+    """A daily request limit from a form: empty means "not set"."""
+    if value in (None, ""):
+        return 0
+    try:
+        limit = int(value)
+    except (TypeError, ValueError):
+        raise HTTPError(400, "'daily_limit' must be a whole number") from None
+    if limit < 0:
+        raise HTTPError(400, "'daily_limit' must be a whole number")
+    return limit
+
+
+def _existing_limit(system: AgenticOS, provider_id: str) -> int:
+    return next((p["daily_limit"] for p in system.providers.public() if p["id"] == provider_id), 0)
 
 
 def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
@@ -207,11 +235,20 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                         doc_id = str(rec.metadata.get("doc_id"))
                         entry = docs.setdefault(doc_id, {"id": doc_id, "source": rec.metadata.get("source")
                                                          or rec.metadata.get("title") or "bez nazwy",
+                                                         "type": rec.metadata.get("type") or "",
+                                                         "added_at": rec.metadata.get("added_at"),
                                                          "chunks": 0, "preview": rec.text[:160]})
                         entry["chunks"] += 1
                     return 200, {"documents": list(docs.values())}
+                if path == "/knowledge/search":
+                    query = urllib.parse.parse_qs(self.path.partition("?")[2]).get("q", [""])[0].strip()
+                    hits = system.knowledge.retrieve(query, k=8) if query else []
+                    return 200, {"results": [{"doc_id": h.metadata.get("doc_id"), "source": h.source, "text": h.text[:400],
+                                              "score": round(h.score, 4)} for h in hits]}
                 if path == "/graph":
                     return 200, system.graph()
+                if path == "/schedules":
+                    return 200, {"schedules": [asdict(x) for x in system.schedules.all()]}
                 if path == "/auth/check":
                     return 200, {"ok": True}
                 if path == "/skills":
@@ -235,6 +272,14 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                     if not system.providers.remove(m.group(1)):
                         raise HTTPError(404, f"No provider {m.group(1)!r}")
                     return 200, {"ok": True}
+                if m := re.fullmatch(r"/knowledge/([\w:-]+)", path):
+                    if not system.remove_document(m.group(1)):
+                        raise HTTPError(404, f"No document {m.group(1)!r}")
+                    return 200, {"ok": True}
+                if m := re.fullmatch(r"/schedules/(\w+)", path):
+                    if not system.schedules.remove(m.group(1)):
+                        raise HTTPError(404, f"No schedule {m.group(1)!r}")
+                    return 200, {"ok": True}
                 if m := re.fullmatch(r"/agents/([\w-]+)/allowed", path):
                     system.reset_always_allow(m.group(1))
                     return 200, {"ok": True}
@@ -246,6 +291,22 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 if (m := re.fullmatch(r"/(skills|mods|mcp)/([\w-]+)", path)) and removers[m.group(1)](m.group(2)):
                     return 200, {"ok": True}
                 raise HTTPError(404, f"No route or item for DELETE {path}")
+
+            if path == "/knowledge/upload":
+                query = urllib.parse.parse_qs(self.path.partition("?")[2])
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > MAX_UPLOAD:
+                    raise HTTPError(413, "Plik jest za duży (max 60 MB)")
+                raw = self.rfile.read(length) if length else b""
+                filename = os.path.basename(query.get("filename", [""])[0]) or "plik.txt"
+                if not raw.strip():
+                    raise HTTPError(400, "Pusty plik")
+                text = extract_text(raw, filename)
+                if not text.strip():
+                    raise HTTPError(400, "Pusty plik")
+                doc = Document(text, {"source": filename, "type": file_type(filename) or "txt",
+                                      "added_at": time.time(), "bytes": len(raw)})
+                return 201, {"id": doc.id, "documents": 1, "chunks": system.ingest(doc)}
 
             if path == "/memory/import":
                 query = urllib.parse.parse_qs(self.path.partition("?")[2])
@@ -293,7 +354,8 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 cfg = ProviderConfig(
                     id=pid, kind=str(body.get("kind", "openai_compat")), api_key=str(body.get("api_key") or ""),
                     base_url=str(body.get("base_url") or ""), default_model=str(body.get("default_model") or ""),
-                    label=str(body.get("label") or pid),
+                    label=str(body.get("label") or pid), daily_limit=_limit(body["daily_limit"]) if "daily_limit" in body
+                    else _existing_limit(system, pid),
                 )
                 system.providers.upsert(cfg)
                 if body.get("make_default"):
@@ -301,7 +363,12 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 return 201, cfg.public()
             if m := re.fullmatch(r"/providers/([\w-]+)/test", path):
                 llm = system.providers.build(m.group(1), body.get("model") or None)
-                reply = llm.complete([Message.user("Reply with exactly: OK")], max_tokens=200)
+                try:
+                    reply = llm.complete([Message.user("Reply with exactly: OK")], max_tokens=200)
+                except Exception:
+                    system.providers.record_test(m.group(1), False)
+                    raise
+                system.providers.record_test(m.group(1), True)
                 return 200, {"ok": True, "reply": reply.text[:200], "model": reply.model or getattr(llm, "model", None)}
             if path == "/settings/default":
                 system.set_default_model(_require(body, "provider"), body.get("model") or None)
@@ -391,8 +458,22 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 for d in docs:
                     if not isinstance(d, dict) or not isinstance(d.get("text"), str):
                         raise HTTPError(400, "Each document needs a 'text' string")
-                    chunks += system.ingest(Document(d["text"], dict(d.get("metadata") or {})))
+                    meta = dict(d.get("metadata") or {})
+                    meta.setdefault("added_at", time.time())
+                    chunks += system.ingest(Document(d["text"], meta))
                 return 201, {"documents": len(docs), "chunks": chunks}
+            if path == "/schedules":
+                sched = Schedule(task=str(body.get("task") or ""), time=str(body.get("time") or "07:30"),
+                                 agent=str(body.get("agent") or "assistant"), days=str(body.get("days") or "daily"),
+                                 title=str(body.get("title") or ""), enabled=bool(body.get("enabled", True)),
+                                 tz=str(body.get("tz") or ""))
+                return 201, asdict(system.add_schedule(sched))
+            if m := re.fullmatch(r"/schedules/(\w+)/run", path):
+                return 202, system.run_schedule(m.group(1)).to_dict()
+            if m := re.fullmatch(r"/schedules/(\w+)", path):
+                if "agent" in body:
+                    system.agent(str(body["agent"]))
+                return 200, asdict(system.schedules.update(m.group(1), body))
             if path == "/goal":
                 result = system.goal(_require(body, "goal"), agents=body.get("agents"))
                 return 200, result.to_dict()
@@ -409,6 +490,7 @@ def serve(system: AgenticOS, host: str = "127.0.0.1", port: int = 8000) -> None:
     if host not in ("127.0.0.1", "localhost", "::1") and not system.settings.api_key:
         raise SystemExit("Refusing to serve on a public interface without AGENTIC_OS_API_KEY (the War Room password).")
     httpd = make_server(system, host, port)
+    system.start_scheduler()
     print(f"Agentic OS War Room on http://{host}:{port}")
     try:
         httpd.serve_forever()

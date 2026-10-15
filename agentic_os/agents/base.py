@@ -106,6 +106,7 @@ class Agent:
         self.retrieve_k = retrieve_k
         self.strategy = strategy or ZeroShot()
         self.max_steps = max_steps
+        self.on_step: Callable[[int, int], None] | None = None  # progress callback: (step, max_steps)
         self.max_tokens = max_tokens
         self.remember_episodes = remember_episodes
         self.approve_tool = approve_tool
@@ -170,6 +171,8 @@ class Agent:
 
             for step in range(1, self.max_steps + 1):
                 result.steps = step
+                if self.on_step is not None:
+                    self.on_step(step, self.max_steps)
                 with self.tracer.span("llm.complete", step=step), self.metrics.timer("llm.complete"):
                     response = self.llm.complete(
                         history + turn, system=system, tools=tool_list, max_tokens=self.max_tokens

@@ -8,8 +8,11 @@
   <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#111413" media="(prefers-color-scheme: dark)">
   <script>
-    /* Apply the saved theme before the first paint so the page never flashes the other one. */
-    try { var t = localStorage.getItem("aos_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) { /* storage blocked */ }
+    /* Apply the saved theme and accent before the first paint so the page never flashes the other one. */
+    try {
+      var t = localStorage.getItem("aos_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      var a = localStorage.getItem("aos_accent"); if (a === "indigo" || a === "amber" || a === "pink") document.documentElement.dataset.accent = a;
+    } catch (e) { /* storage blocked */ }
   </script>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -17,27 +20,35 @@
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+  <!-- LOGOWANIE -->
   <div id="login" class="login hidden" role="dialog" aria-labelledby="login-title">
-    <form id="login-form" class="card login-card">
-      <img src="/icon.svg" alt="" width="56" height="56">
-      <h1 id="login-title">Agentic OS</h1>
-      <p class="muted">Podaj hasło do swojego War Roomu.</p>
-      <label class="field"><span>Hasło</span>
-        <input id="login-token" type="password" autocomplete="current-password" required>
-      </label>
-      <p id="login-error" class="error" role="alert"></p>
-      <button class="btn primary" type="submit">Wejdź</button>
-    </form>
+    <div class="login-main">
+      <div class="login-hero">
+        <span class="logo-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 8l8 8M16 8l-8 8"/></svg></span>
+        <div class="login-copy">
+          <h1 id="login-title">Połącz z Agentic OS</h1>
+          <p>Twoi agenci działają na Twoim serwerze. Wpisz jego adres i hasło do War Room.</p>
+        </div>
+      </div>
+      <form id="login-form" class="login-form">
+        <label class="login-field"><span>Adres serwera</span>
+          <input id="login-server" type="url" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://twoj-serwer.app.github.dev">
+        </label>
+        <label class="login-field"><span>Hasło</span>
+          <input id="login-token" type="password" autocomplete="current-password">
+        </label>
+        <p id="login-error" class="error" role="alert"></p>
+        <button class="login-submit" type="submit">Zaloguj</button>
+        <div class="or"><span></span>lub<span></span></div>
+        <button id="login-qr" class="login-qr" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2M14 18h2M18 18h2v2"/></svg>Skanuj kod QR z komputera</button>
+        <input id="login-qr-file" type="file" accept="image/*" capture="environment" hidden>
+      </form>
+    </div>
+    <p class="login-foot">Nie masz serwera? <a href="https://github.com/JavsonOf/agentic-os#readme" target="_blank" rel="noopener">Jak go uruchomić</a></p>
   </div>
 
   <div id="app" class="app hidden">
-    <header class="topbar">
-      <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 8l8 8M16 8l-8 8"/></svg></span><span>Agentic OS</span></div>
-      <button id="model-badge" class="badge" type="button" data-go="models" title="Domyślny model – zmień w Modele"></button>
-      <button id="install-btn" class="btn small hidden" type="button">Zainstaluj</button>
-    </header>
-
-    <nav class="tabs" aria-label="Sekcje">
+    <nav class="tabs" aria-label="Główne sekcje">
       <button data-tab="chat" class="tab active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><span>Czat</span></button>
       <button data-tab="tasks" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Zadania</span></button>
       <button data-tab="knowledge" class="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg><span>Wiedza</span></button>
@@ -48,21 +59,63 @@
     <div id="approvals" class="approvals hidden" aria-live="assertive"></div>
 
     <main>
-      <!-- CZAT -->
-      <section id="tab-chat" class="panel active chat-panel">
-        <div class="chat-head">
-          <label class="field inline"><span>Agent</span><select id="chat-agent"></select></label>
-          <label class="field inline"><span class="sr-only">Uprawnienia agenta</span><select id="chat-permission" title="Uprawnienia agenta: możesz je zmienić w każdej chwili"></select></label>
-          <button id="chat-reset" class="btn small ghost" type="button">Nowa rozmowa</button>
+      <!-- CZAT: ekran startowy -->
+      <section id="tab-chat" class="panel active start-panel">
+        <header class="brand-head">
+          <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 8l8 8M16 8l-8 8"/></svg></span><strong>Agentic OS</strong></div>
+          <button id="model-pill" class="pill" type="button" data-go="models" title="Domyślny model – zmień w Modele"><span class="dot"></span><span id="model-pill-text">…</span></button>
+        </header>
+        <div class="hello">
+          <span id="hello-greeting">Dzień dobry</span>
+          <h1>Z kim dziś pracujemy?</h1>
         </div>
         <div id="offline-banner" class="offline-banner hidden" role="status">
           <span>⚠️ <b>Brak modelu AI.</b> Agent działa w trybie offline i nie rozumie pytań. Dodaj klucz, np. Gemini.</span>
-          <button id="offline-fix" class="btn small primary" type="button">🔑 Dodaj klucz</button>
+          <button id="offline-fix" class="btn small primary" type="button">Dodaj klucz</button>
+        </div>
+        <div id="agent-cards" class="agent-cards" role="list" aria-label="Agenci"></div>
+        <section class="quick">
+          <h2 class="section-label underline">Szybkie zadania</h2>
+          <div class="quick-grid">
+            <button type="button" class="quick-btn" data-quick="notes">Streść moje notatki</button>
+            <button type="button" class="quick-btn" data-quick="week">Zaplanuj tydzień</button>
+            <button type="button" class="quick-btn" data-quick="crew">Zbierz zespół agentów</button>
+            <button type="button" class="quick-btn" data-quick="import">Importuj pamięć z ChatGPT</button>
+          </div>
+        </section>
+        <form id="start-form" class="composer">
+          <label class="sr-only" for="start-text">Wiadomość</label>
+          <input id="start-text" placeholder="Napisz do agenta…" autocomplete="off" enterkeyhint="send">
+          <button id="start-mic" class="composer-mic hidden" type="button" aria-label="Mów"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+          <button class="composer-send" type="submit" aria-label="Wyślij"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+        </form>
+      </section>
+
+      <!-- CZAT: rozmowa -->
+      <section id="tab-convo" class="panel convo-panel">
+        <header class="convo-head">
+          <button class="icon-plain" type="button" id="convo-back" aria-label="Wróć"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <span class="convo-avatar" id="convo-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4"/></svg></span>
+          <div class="convo-title">
+            <strong id="convo-name">assistant</strong>
+            <span id="convo-sub"></span>
+          </div>
+          <button class="icon-soft" type="button" id="convo-settings" aria-label="Ustawienia agenta" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg></button>
+        </header>
+        <div id="convo-sheet" class="convo-sheet hidden">
+          <label class="field"><span>Agent</span><select id="chat-agent"></select></label>
+          <label class="field"><span>Uprawnienia</span><select id="chat-permission"></select></label>
+          <label class="field"><span>Tryb myślenia</span><select id="chat-mode"></select></label>
+          <button id="chat-reset" class="btn ghost" type="button">Nowa rozmowa</button>
         </div>
         <div id="chat-log" class="chat-log" aria-live="polite"></div>
-        <form id="chat-form" class="chat-input">
-          <textarea id="chat-text" rows="1" placeholder="Napisz do agenta…" required></textarea>
-          <button class="btn primary send-btn" type="submit" aria-label="Wyślij"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+        <form id="chat-form" class="convo-composer">
+          <button id="chat-attach" class="composer-attach" type="button" aria-label="Dodaj plik"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <input id="chat-file" type="file" accept=".pdf,.txt,.md,.docx,.csv,.json,text/*,application/pdf" hidden>
+          <label class="convo-input"><span class="sr-only">Wiadomość</span>
+            <textarea id="chat-text" rows="1" placeholder="Napisz do agenta…" enterkeyhint="send"></textarea>
+          </label>
+          <button class="composer-send" type="submit" aria-label="Wyślij"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
         </form>
       </section>
 
@@ -72,7 +125,7 @@
         <h2>Twoi agenci</h2>
         <div id="agent-list" class="grid"></div>
 
-        <details class="card form-card">
+        <details class="card form-card" id="agent-form-card">
           <summary>➕ Nowy agent</summary>
           <form id="agent-form" class="stack">
             <label class="field"><span>Nazwa (litery, cyfry, _ -)</span><input name="name" pattern="[a-zA-Z0-9_\-]{1,40}" required></label>
@@ -125,7 +178,7 @@
           </form>
         </details>
 
-        <details class="card form-card">
+        <details class="card form-card" id="crew-form-card">
           <summary>👥 Uruchom zespół agentów</summary>
           <form id="crew-form" class="stack">
             <fieldset class="field"><legend>Członkowie zespołu</legend><div id="crew-agents" class="chips"></div></fieldset>
@@ -143,11 +196,40 @@
         </details>
       </section>
 
+
       <!-- ZADANIA -->
       <section id="tab-tasks" class="panel">
-        <div class="section-head"><h2>Zadania</h2><button id="tasks-refresh" class="btn small ghost" type="button">Odśwież</button></div>
-        <div id="task-list" class="list"></div>
-        <div id="task-detail" class="card hidden"></div>
+        <header class="screen-head">
+          <h1>Zadania</h1>
+          <button id="schedule-new" class="head-btn primary" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Zaplanuj</button>
+        </header>
+        <div class="filters" role="tablist" aria-label="Filtr zadań">
+          <button type="button" class="filter on" data-filter="all" role="tab" aria-selected="true">Wszystkie</button>
+          <button type="button" class="filter" data-filter="running" role="tab" aria-selected="false" id="filter-running">W toku</button>
+          <button type="button" class="filter" data-filter="scheduled" role="tab" aria-selected="false">Zaplanowane</button>
+        </div>
+        <form id="schedule-form" class="card stack hidden">
+          <h3 id="schedule-form-title">Nowe zaplanowane zadanie</h3>
+          <input type="hidden" name="id">
+          <label class="field"><span>Nazwa</span><input name="title" placeholder="np. Poranne podsumowanie" maxlength="80"></label>
+          <label class="field"><span>Co agent ma zrobić</span><textarea name="task" rows="3" required placeholder="np. Podsumuj moje zadania i notatki na dziś."></textarea></label>
+          <div class="row">
+            <label class="field"><span>Godzina</span><input name="time" type="time" value="07:30" required></label>
+            <label class="field"><span>Kiedy</span>
+              <select name="days"><option value="daily">Codziennie</option><option value="weekdays">W dni robocze</option><option value="weekends">W weekendy</option></select>
+            </label>
+          </div>
+          <label class="field"><span>Agent</span><select name="agent" id="schedule-agent"></select></label>
+          <div class="row">
+            <button class="btn primary" type="submit">Zapisz</button>
+            <button class="btn ghost" type="button" id="schedule-cancel">Anuluj</button>
+            <button class="btn ghost hidden" type="button" id="schedule-run">Uruchom teraz</button>
+            <button class="btn ghost danger hidden" type="button" id="schedule-delete">Usuń</button>
+          </div>
+        </form>
+        <div id="task-list" class="task-list"></div>
+        <h2 class="section-label" id="schedule-title">Zaplanowane</h2>
+        <div id="schedule-list" class="task-list"></div>
       </section>
 
       <!-- MÓZG -->
@@ -159,7 +241,7 @@
         <div class="brain-wrap"><canvas id="brain" aria-label="Graf wiedzy"></canvas></div>
         <div id="brain-detail" class="card hidden"></div>
 
-        <details class="card form-card">
+        <details class="card form-card" id="mem-import-card">
           <summary>📥 Importuj pamięć z innego AI</summary>
           <div class="stack">
             <p class="muted small">Wgraj eksport danych z <b>ChatGPT</b> (Ustawienia → Kontrola danych → Eksportuj dane: plik .zip), <b>Claude</b> (Settings → Privacy → Export data), <b>Gemini</b> (Google Takeout → Gemini, format JSON), <b>Grok</b>, <b>DeepSeek</b> lub <b>Mistral</b> (plik .zip/.json). Albo skopiuj listę zapisanych wspomnień z ustawień dowolnego asystenta i wklej ją poniżej.</p>
@@ -172,23 +254,42 @@
         </details>
       </section>
 
+
       <!-- WIEDZA -->
       <section id="tab-knowledge" class="panel">
-        <h2>Wiedza</h2>
+        <header class="screen-head col">
+          <h1>Wiedza</h1>
+          <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-3.5-3.5"/></svg><span class="sr-only">Szukaj w wiedzy</span>
+            <input id="kb-search" type="search" placeholder="Szukaj w dokumentach…" autocomplete="off" enterkeyhint="search">
+          </label>
+        </header>
+        <div id="kb-results" class="kb-results hidden"></div>
+        <button id="kb-drop" class="dropzone" type="button">
+          <span class="tile soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg></span>
+          <strong>Dodaj pliki</strong>
+          <span class="muted">PDF, TXT, MD, DOCX · do 60 MB</span>
+        </button>
+        <input id="kb-files" type="file" multiple accept=".pdf,.txt,.md,.docx,.csv,.json,text/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+        <div id="kb-progress" class="muted small hidden" role="status"></div>
+        <div class="list-head"><h2 class="section-label">Twoje dokumenty</h2><span id="kb-count" class="muted"></span></div>
+        <div id="kb-list" class="group-card"></div>
+        <article class="import-card">
+          <span class="import-text"><strong>Importuj pamięć</strong><span>Przenieś historię z ChatGPT lub Claude (plik ZIP).</span></span>
+          <button id="kb-import" class="small-btn primary" type="button">Importuj</button>
+        </article>
         <button class="menu-item card-link" type="button" data-go="brain">
           <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><path d="M8 12h2M13.7 10.8l2.6-3.6M13.7 13.2l2.6 3.6"/></svg></span>
-          <span class="menu-text"><b>Mózg i pamięć</b><small>Graf wspomnień agenta i import pamięci z ChatGPT lub Claude</small></span>
+          <span class="menu-text"><b>Mózg i pamięć</b><small>Graf wspomnień agenta i wszystko, co pamięta</small></span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
         </button>
-        <form id="kb-form" class="card stack">
-          <label class="field"><span>Tytuł</span><input name="source" placeholder="np. cennik.md"></label>
-          <label class="field"><span>Treść</span><textarea name="text" rows="5" required placeholder="Wklej tekst, z którego agenci mają korzystać…"></textarea></label>
-          <div class="row">
-            <label class="btn ghost file-btn">📄 Wczytaj plik .txt/.md<input id="kb-file" type="file" accept=".txt,.md,.csv,.json,text/*" hidden></label>
+        <details class="card form-card">
+          <summary>Wklej tekst zamiast pliku</summary>
+          <form id="kb-form" class="stack">
+            <label class="field"><span>Tytuł</span><input name="source" placeholder="np. cennik.md"></label>
+            <label class="field"><span>Treść</span><textarea name="text" rows="5" required placeholder="Wklej tekst, z którego agenci mają korzystać…"></textarea></label>
             <button class="btn primary" type="submit">Dodaj do wiedzy</button>
-          </div>
-        </form>
-        <div id="kb-list" class="list"></div>
+          </form>
+        </details>
       </section>
 
       <!-- ROZSZERZENIA -->
@@ -251,14 +352,16 @@
         </details>
       </section>
 
+
       <!-- MODELE -->
       <section id="tab-models" class="panel">
-        <h2>Modele i klucze API</h2>
-        <p class="muted small">Klucze są zapisywane tylko na serwerze i nigdy nie wracają do przeglądarki w całości.</p>
-        <div id="default-model" class="card"></div>
-        <div id="provider-list" class="list"></div>
-        <details class="card form-card" open>
-          <summary>➕ Dodaj dostawcę / klucz</summary>
+        <header class="screen-head">
+          <h1>Modele</h1>
+          <button id="provider-add" class="head-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Dostawca</button>
+        </header>
+        <div id="provider-cards" class="provider-cards"></div>
+        <details class="card form-card" id="provider-form-card">
+          <summary>Dostawca i klucz API</summary>
           <form id="provider-form" class="stack">
             <label class="field"><span>Dostawca</span><select id="provider-preset"></select></label>
             <div class="row">
@@ -270,52 +373,55 @@
             <label class="field"><span>Adres API (base URL)</span><input name="base_url" placeholder="https://…/v1"></label>
             <label class="field"><span>Klucz API</span><input name="api_key" type="password" autocomplete="off" placeholder="zostaw puste, żeby nie zmieniać"></label>
             <label class="field"><span>Domyślny model</span><input name="default_model" placeholder="np. gemini-flash-latest"></label>
+            <label class="field"><span>Dzienny limit zapytań (opcjonalnie, np. 20 na darmowym planie)</span><input name="daily_limit" type="number" min="0" step="1" inputmode="numeric" placeholder="brak"></label>
             <label class="check"><input type="checkbox" name="make_default"> Ustaw jako domyślny model systemu</label>
             <button class="btn primary" type="submit">Zapisz</button>
           </form>
         </details>
       </section>
 
-      <!-- TY: ustawienia i rzadziej używane sekcje -->
+      <!-- TY: ustawienia -->
       <section id="tab-me" class="panel">
-        <div class="profile">
+        <header class="profile">
           <span class="avatar">TY</span>
-          <div><h2>Twoje ustawienia</h2><p class="muted small" id="me-server"></p></div>
-        </div>
-        <section class="card stack" aria-labelledby="look-title">
-          <h3 id="look-title">Wygląd</h3>
-          <fieldset class="segmented" id="theme-choice">
-            <legend class="sr-only">Motyw</legend>
-            <label><input type="radio" name="theme" value="light">Jasny</label>
-            <label><input type="radio" name="theme" value="dark">Ciemny</label>
-            <label><input type="radio" name="theme" value="system">Systemowy</label>
-          </fieldset>
-          <p class="muted small">„Systemowy” przełącza się razem z ustawieniem telefonu lub komputera.</p>
+          <div><h1>Twoje ustawienia</h1><p class="muted" id="me-server"></p></div>
+        </header>
+        <h2 class="group-title">Wygląd</h2>
+        <section class="group-card pad">
+          <div class="setting">
+            <span class="setting-label" id="theme-label">Motyw</span>
+            <div class="segmented" id="theme-choice" role="radiogroup" aria-labelledby="theme-label">
+              <label><input type="radio" name="theme" value="light">Jasny</label>
+              <label><input type="radio" name="theme" value="dark">Ciemny</label>
+              <label><input type="radio" name="theme" value="system">Systemowy</label>
+            </div>
+          </div>
+          <div class="setting">
+            <span class="setting-label" id="accent-label">Kolor akcentu</span>
+            <div class="swatches" id="accent-choice" role="radiogroup" aria-labelledby="accent-label">
+              <label class="swatch" style="--sw:#0f766e;--sw-dark:#2bb3a3"><input type="radio" name="accent" value="teal"><span class="sr-only">Akcent: Morski</span></label>
+              <label class="swatch" style="--sw:#4338ca;--sw-dark:#4338ca"><input type="radio" name="accent" value="indigo"><span class="sr-only">Akcent: Indygo</span></label>
+              <label class="swatch" style="--sw:#b45309;--sw-dark:#b45309"><input type="radio" name="accent" value="amber"><span class="sr-only">Akcent: Bursztyn</span></label>
+              <label class="swatch" style="--sw:#be185d;--sw-dark:#be185d"><input type="radio" name="accent" value="pink"><span class="sr-only">Akcent: Malinowy</span></label>
+            </div>
+          </div>
         </section>
-        <h3 class="group-title">Agenci i narzędzia</h3>
-        <div class="menu-list">
-          <button class="menu-item" type="button" data-go="agents">
-            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4M9.5 12h.01M14.5 12h.01"/></svg></span>
-            <span class="menu-text"><b>Agenci</b><small>Twoi agenci, uprawnienia, zespoły i agenci zewnętrzni</small></span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-          </button>
-          <button class="menu-item" type="button" data-go="ext">
-            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4V4z"/></svg></span>
-            <span class="menu-text"><b>Rozszerzenia</b><small>Skille, własne narzędzia (mody) i serwery MCP</small></span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-          </button>
+
+        <h2 class="group-title">Agenci</h2>
+        <div class="group-card">
+          <button class="row-item" type="button" id="me-permission"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span class="row-label">Uprawnienia</span><span class="row-value" id="me-permission-value"></span></button>
+          <button class="row-item" type="button" id="me-mode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg><span class="row-label">Tryb myślenia</span><span class="row-value" id="me-mode-value"></span></button>
+          <button class="row-item" type="button" data-go="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4"/></svg><span class="row-label">Agenci</span><span class="row-value" id="me-agents-value"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
         </div>
-        <h3 class="group-title">Aplikacja</h3>
-        <div class="menu-list">
-          <button class="menu-item" type="button" data-go="monitor">
-            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
-            <span class="menu-text"><b>Monitoring</b><small>Statystyki, tokeny i czasy odpowiedzi</small></span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-          </button>
-          <button class="menu-item danger" type="button" id="logout-btn">
-            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg></span>
-            <span class="menu-text"><b>Wyloguj</b><small>Usuwa hasło zapisane w tej przeglądarce</small></span>
-          </button>
+
+        <h2 class="group-title">Aplikacja</h2>
+        <div class="group-card">
+          <label class="row-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/></svg><span class="row-label">Powiadomienia o prośbach<small id="notify-note" class="row-note hidden"></small></span><input type="checkbox" id="notify-toggle"></label>
+          <button class="row-item" type="button" data-go="ext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4V4z"/></svg><span class="row-label">Rozszerzenia</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button class="row-item" type="button" data-go="monitor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="row-label">Monitoring</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button class="row-item" type="button" id="me-connect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg><span class="row-label">Połącz telefon</span><span class="row-value">kod QR</span></button>
+          <button class="row-item hidden" type="button" id="install-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg><span class="row-label">Zainstaluj aplikację</span></button>
+          <button class="row-item danger" type="button" id="logout-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="row-label">Wyloguj</span></button>
         </div>
       </section>
 
@@ -327,9 +433,17 @@
         <div id="monitor-timings" class="card"></div>
       </section>
     </main>
+
+    <div id="sheet" class="sheet-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="sheet">
+        <div class="sheet-head"><h2 id="sheet-title"></h2><button type="button" class="icon-plain" id="sheet-close" aria-label="Zamknij">✕</button></div>
+        <div id="sheet-body"></div>
+      </div>
+    </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
   <script src="/errors.js"></script>
+  <script src="/qr.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

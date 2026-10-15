@@ -1,6 +1,6 @@
 /* Agentic OS service worker: caches the app shell so it opens like an app; API calls always go to the network. */
-const CACHE = "aos-shell-v10";
-const SHELL = ["/", "/app.js", "/errors.js", "/app.css", "/icon.svg", "/icon-192.png", "/manifest.webmanifest"];
+const CACHE = "aos-shell-v11";
+const SHELL = ["/", "/app.js", "/errors.js", "/qr.js", "/app.css", "/icon.svg", "/icon-192.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -17,4 +17,12 @@ self.addEventListener("fetch", (event) => {
       .then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(event.request, copy)); return res; })
       .catch(() => caches.match(event.request))
   );
+});
+// "Powiadomienia o prośbach": tapping the notification opens (or focuses) the War Room.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    const open = list.find((c) => new URL(c.url).origin === location.origin);
+    return open ? open.focus() : self.clients.openWindow("/");
+  }));
 });

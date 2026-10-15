@@ -71,6 +71,14 @@ class RAGPipeline:
             ids.append(cid)
         return ids
 
+    def remove_document(self, doc_id: str) -> int:
+        """Forget every chunk of one document. Returns how many chunks were removed."""
+        ids = [r.id for r in self.vectors.all() if str(r.metadata.get("doc_id")) == doc_id]
+        for cid in ids:
+            self.vectors.delete(cid)
+            self.keywords.remove(cid)
+        return len(ids)
+
     def add_documents(self, docs: list[Document | str]) -> int:
         return sum(len(self.add_document(d)) for d in docs)
 
