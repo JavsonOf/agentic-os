@@ -76,11 +76,17 @@ const MODES = { standard: "", reflective: "🔁 refleksyjny", adaptive: "🎯 ad
 const STRATEGIES = { zero_shot: "zwięzły", chain_of_thought: "krok po kroku", role: "ekspert" };
 
 async function api(path, { method = "GET", body } = {}) {
-  const res = await fetch(path, {
-    method,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(path, {
+      method,
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    // "Failed to fetch": the phone lost signal, the tab was suspended or the tunnel blinked.
+    throw Object.assign(new Error("Brak połączenia z serwerem"), { network: true });
+  }
   let data = null;
   try { data = await res.json(); } catch { data = null; }
   if (res.status === 401) { showLogin(); throw new Error("Wymagane logowanie"); }
@@ -88,8 +94,14 @@ async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 async function waitForProcess(pid, onTick) {
-  for (let i = 0; i < 600; i++) {
-    const p = await api(`/processes/${pid}`);
+  // The agent keeps working on the server, so a dropped poll is retried instead of losing the answer.
+  for (let i = 0, offline = 0; i < 600; i++) {
+    let p;
+    try { p = await api(`/processes/${pid}`); offline = 0; } catch (err) {
+      if (!err.network || ++offline > 40) throw err;
+      await new Promise((r) => setTimeout(r, 3000));
+      continue;
+    }
     if (onTick) onTick(p);
     if (p.status === "completed" || p.status === "failed") return p;
     await new Promise((r) => setTimeout(r, i < 10 ? 700 : 1500));
