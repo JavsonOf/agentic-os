@@ -10,11 +10,12 @@ Releases follow SemVer: tag ``vMAJOR.MINOR.PATCH`` (now ``v0.MINOR.PATCH``) and 
     python scripts/release_notes.py --next-version v0.2.4    version of the next release, e.g. v0.2.5
     python scripts/release_notes.py --next-title v0.2.4      title of the next release
     python scripts/release_notes.py --migrations             "old-tag new-tag" pairs from "dawniej …" lines
+    python scripts/release_notes.py --apk-name v0.2.1        APK asset name, e.g. AgenticOS_v0.2.1.apk
 
 Published releases are sections "## vX.Y.Z – Title" (a line below may say "dawniej android-N"
 for releases published before SemVer). Any other "## ..." heading (normally "Następne wydanie") holds
 changes that are not released yet, with optional "Tytuł: English title" and "Wersja: major|minor|patch"
-lines. Points are grouped by "### <category>"; points under "Drobne zmiany" never start a release.
+lines ("Wersja: beta", "Wersja: major rc" etc. publish a test build such as v0.3.0-beta.1 instead). Points are grouped by "### <category>"; points under "Drobne zmiany" never start a release.
 """
 
 from __future__ import annotations
@@ -31,9 +32,19 @@ VERSION = r"v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?"
 TAG_HEADING = re.compile(rf"^##\s+({VERSION})(?:\s+[–—-]\s+(.*))?$")
 OLD_TAG = re.compile(r"dawniej\s+(android-\d+)")
 TITLE_LINE = re.compile(r"^Tytuł:\s*(.+)$")
-BUMP_LINE = re.compile(r"^Wersja:\s*(major|minor|patch)\s*$")
-INSTALL = ("---\n**Instalacja na Androidzie:** otwórz tę stronę na telefonie, dotknij **AgenticOS.apk** i zezwól "
+PHASES = ("alpha", "beta", "rc")
+BUMP_LINE = re.compile(r"^Wersja:\s*((?:major|minor|patch)?\s*(?:alpha|beta|rc)?)\s*$")
+INSTALL = ("---\n**Instalacja na Androidzie:** otwórz tę stronę na telefonie, dotknij **{apk}** i zezwól "
            "przeglądarce na instalację, gdy zapyta. Nowa wersja instaluje się na poprzedniej.")
+
+
+def apk_name(tag: str) -> str:
+    """File name of the release's APK asset, e.g. AgenticOS_v0.2.1.apk."""
+    return f"AgenticOS_{tag}.apk"
+
+
+def install(tag: str) -> str:
+    return INSTALL.format(apk=apk_name(tag))
 
 
 def parse_version(tag: str) -> tuple[int, int, int] | None:
@@ -141,19 +152,36 @@ def next_title(text: str, previous_text: str) -> str:
 
 
 def next_version(text: str, previous_text: str, tags: list[str]) -> str:
-    """Bump the newest known version: "Wersja:" line if new, else MINOR for "Dodano" points, else PATCH."""
-    known = [v for v in (parse_version(t) for t in tags + [r["tag"] for r in releases(text)]) if v]
-    major, minor, patch = max(known, default=(0, 0, 0))
-    bump = _line_value(BUMP_LINE, text)
-    if not bump or bump == _line_value(BUMP_LINE, previous_text):
+    """Bump the newest stable version: "Wersja:" line if new, else MINOR for "Dodano" points, else PATCH.
+
+    "Wersja: alpha|beta|rc" (optionally after the bump, e.g. "Wersja: major rc") makes a test build of the
+    next version: v0.3.0-beta.1, then -beta.2, ... Without it, the stable release keeps the tested number.
+    """
+    all_tags = tags + [r["tag"] for r in releases(text)]
+    stable = [v for v in (parse_version(t) for t in all_tags if "-" not in t) if v]
+    major, minor, patch = max(stable, default=(0, 0, 0))
+    line = _line_value(BUMP_LINE, text)
+    words = line.split() if line != _line_value(BUMP_LINE, previous_text) else []
+    phase = next((w for w in words if w in PHASES), "")
+    bump = next((w for w in words if w not in PHASES), "")
+    if not bump:
         bump = "minor" if any(c == "Dodano" for c, _ in new_points(text, previous_text)) else "patch"
-    if not known:
-        return "v0.1.0"
-    if bump == "major":
-        return f"v{major + 1}.0.0"
-    if bump == "minor":
-        return f"v{major}.{minor + 1}.0"
-    return f"v{major}.{minor}.{patch + 1}"
+    if not stable:
+        version = "v0.1.0"
+    elif bump == "major":
+        version = f"v{major + 1}.0.0"
+    elif bump == "minor":
+        version = f"v{major}.{minor + 1}.0"
+    else:
+        version = f"v{major}.{minor}.{patch + 1}"
+    # test builds already fixed the next number: further builds and the stable release keep it
+    tested = [v for v in (parse_version(t) for t in all_tags if "-" in t) if v and v > (major, minor, patch)]
+    if tested:
+        version = "v{}.{}.{}".format(*max(tested))
+    if not phase:
+        return version
+    builds = [int(m.group(1)) for t in all_tags if (m := re.fullmatch(rf"{re.escape(version)}-{phase}\.(\d+)", t))]
+    return f"{version}-{phase}.{max(builds, default=0) + 1}"
 
 
 def file_at(ref: str, path: str = "CHANGELOG.md") -> str:
@@ -176,8 +204,12 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--next-version", metavar="PREVIOUS", help="print the version of the next release")
     group.add_argument("--next-title", metavar="PREVIOUS", help="print the title of the next release")
     group.add_argument("--migrations", action="store_true", help="print 'old-tag new-tag' for releases to rename")
+    group.add_argument("--apk-name", metavar="TAG", help="print the APK asset name of a release")
     parser.add_argument("--changelog", default="CHANGELOG.md")
     args = parser.parse_args(argv)
+    if args.apk_name:
+        sys.stdout.write(apk_name(args.apk_name) + "\n")
+        return 0
     text = Path(args.changelog).read_text(encoding="utf-8")
     if args.migrations:
         sys.stdout.writelines(f"{r['old']} {r['tag']}\n" for r in releases(text) if r["old"])
@@ -187,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.tag:
         note = old_version_note(text, args.tag)
-        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{INSTALL}\n")
+        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{install(args.tag)}\n")
         return 0
     previous_ref = next(v for v in (args.since, args.worth_release, args.next_version, args.next_title) if v is not None)
     previous = file_at(previous_ref) if previous_ref else ""
@@ -198,7 +230,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.next_title is not None:
         sys.stdout.write(next_title(text, previous) + "\n")
     else:
-        sys.stdout.write(f"{notes_since(text, previous)}\n\n{INSTALL}\n")
+        version = next_version(text, previous, git_tags())
+        sys.stdout.write(f"{notes_since(text, previous)}\n\n{install(version)}\n")
     return 0
 
 

@@ -90,8 +90,11 @@ paste keys into chat, do not put keys in environment files you commit, and never
   (e.g. `v0.2.1 – Clear Connection Errors in the Android App`), without "Agentic OS" or "Release". The notes
   stay in Polish. Write the title in the `Tytuł:` line of **Następne wydanie** in `CHANGELOG.md`; add
   `Wersja: major` (or `minor`) only to force a bigger bump.
+- Test builds: `Wersja: alpha`, `beta` or `rc` (or e.g. `Wersja: major rc`) publishes a GitHub pre-release
+  such as `v0.3.0-beta.1`, `-beta.2` on the next merge, never marked "Latest". Remove the line to publish the
+  stable release, which keeps the tested number (`v0.3.0`).
 - The android workflow computes the version and publishes the release; `release-notes` keeps older releases
-  in line with `CHANGELOG.md`. Test builds, if ever needed, use suffixes such as `v0.3.0-beta.1`.
+  in line with `CHANGELOG.md`. The APK asset is named `AgenticOS_vX.Y.Z.apk`.
 
 ## Never
 
