@@ -105,3 +105,76 @@ def test_token_estimates():
     text = "word " * 500
     short = truncate_to_tokens(text, 50)
     assert estimate_tokens(short) <= 51 and short.endswith("…")
+
+
+class _FakeResponse:
+    def __init__(self, body):
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def _http_error(code, headers=None):
+    import io
+    import urllib.error
+    from email.message import Message as Headers
+
+    hdrs = Headers()
+    for key, value in (headers or {}).items():
+        hdrs[key] = value
+    return urllib.error.HTTPError("https://x/chat/completions", code, "err", hdrs, io.BytesIO(b'{"error": "busy"}'))
+
+
+def test_post_json_retries_temporary_overload(monkeypatch):
+    import urllib.request
+
+    from agentic_os.llm import openai_compat
+
+    outcomes = [_http_error(503), _http_error(429, {"Retry-After": "1"}), _FakeResponse(b'{"ok": true}')]
+    sleeps = []
+
+    def fake_urlopen(request, timeout):
+        result = outcomes.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(openai_compat.time, "sleep", sleeps.append)
+    assert openai_compat.post_json("https://x/chat/completions", {}, {}, 5) == {"ok": True}
+    assert sleeps == [openai_compat.RETRY_DELAYS[0], 1.0]
+
+
+def test_post_json_gives_up_after_retries_and_skips_client_errors(monkeypatch):
+    import urllib.request
+
+    import pytest
+
+    from agentic_os.llm import LLMError, openai_compat
+
+    calls = []
+
+    def always(code):
+        def fake_urlopen(request, timeout):
+            calls.append(code)
+            raise _http_error(code)
+        return fake_urlopen
+
+    monkeypatch.setattr(openai_compat.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(urllib.request, "urlopen", always(503))
+    with pytest.raises(LLMError, match="HTTP 503"):
+        openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
+    assert len(calls) == len(openai_compat.RETRY_DELAYS) + 1
+
+    calls.clear()
+    monkeypatch.setattr(urllib.request, "urlopen", always(401))
+    with pytest.raises(LLMError, match="HTTP 401"):
+        openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
+    assert calls == [401]
