@@ -52,3 +52,14 @@ def test_notes_for_tag_and_the_real_changelog():
         assert notes.startswith("### ") and "Drobne poprawki" not in notes
     for _, category, _ in release_notes.parse(text):
         assert category in release_notes.CATEGORIES
+
+
+def test_minor_changes_wait_for_the_next_real_release():
+    base = "## Następne wydanie\n\n### Naprawiono\n- Stara poprawka.\n"
+    minor = base + "\n### Drobne zmiany\n- Literówka w opisie.\n"
+    assert release_notes.worth_release(minor, base) is False
+    real = minor + "\n### Dodano\n- Nowa funkcja.\n"
+    assert release_notes.worth_release(real, base) is True
+    notes = release_notes.notes_since(real, base)
+    assert notes.index("### Dodano") < notes.index("### Drobne zmiany") and "Literówka" in notes
+    assert release_notes.worth_release(base, base) is False

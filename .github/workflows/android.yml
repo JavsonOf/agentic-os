@@ -2,8 +2,7 @@ name: android
 
 on:
   push:
-    branches: [main]
-    paths: ["android/**", ".github/workflows/android.yml"]
+    branches: [main]  # a merge with a real change (see CHANGELOG.md) gets its own release
   pull_request:
     paths: ["android/**", ".github/workflows/android.yml"]
   workflow_dispatch:
@@ -34,13 +33,19 @@ jobs:
           name: AgenticOS-apk
           path: AgenticOS.apk
       - name: Release notes
+        id: notes
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |
           previous=$(git tag --list 'android-*' --sort=-v:refname | head -n 1)
           python3 scripts/release_notes.py --since "$previous" > release-notes.md
           cat release-notes.md
+          # A release only for real changes (or a new app build); "Drobne zmiany" wait for the next one.
+          worth=$(python3 scripts/release_notes.py --worth-release "$previous")
+          if [ -z "$previous" ] || ! git diff --quiet "$previous" HEAD -- android; then worth=yes; fi
+          echo "publish=$worth" >> "$GITHUB_OUTPUT"
+          echo "Publish a release: $worth"
       - name: Publish release
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: steps.notes.outputs.publish == 'yes'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-${{ github.run_number }}

@@ -5,12 +5,18 @@ zmieniło dla użytkownika, ale nie podają szczegółów technicznych, adresów
 mogłyby komuś pomóc w ataku.
 
 Nowe zmiany dopisuj w sekcji **Następne wydanie**, w jednej z kategorii: Dodano, Zmieniono, Usunięto,
-Naprawiono, Ulepszono. Przy publikacji wydania automat sam wybiera punkty, których nie było w poprzednim.
+Naprawiono, Ulepszono. Scalenie takiej zmiany od razu tworzy nowe wydanie z punktami, których nie było
+w poprzednim. Drobiazgi, dla których nie warto wydawać nowej wersji (literówka, kosmetyka, porządki
+w kodzie, dokumentacja), wpisuj w kategorii **Drobne zmiany**: zostają zapisane i pojawią się w opisie
+najbliższego prawdziwego wydania. Nowa wersja aplikacji na Androida zawsze dostaje wydanie.
 
 ## Następne wydanie
 
 ### Dodano
 - Każde wydanie na GitHubie ma teraz opis po polsku: co dodano, co zmieniono, co usunięto, jakie błędy naprawiono i co ulepszono.
+
+### Zmieniono
+- Nowe wydanie powstaje po każdej ważnej zmianie w Agentic OS, a nie tylko po zmianach w aplikacji na Androida. Drobiazgi trafiają do opisu najbliższego wydania zamiast tworzyć osobne.
 
 ## android-9 · 15.10.2026
 
