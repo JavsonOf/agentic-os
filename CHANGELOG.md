@@ -29,7 +29,11 @@ W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title 
 
 ## Następne wydanie
 
-Tytuł: Semantic Versioning & Readable Release Titles
+### Drobne zmiany
+- Wydania sprzed zmiany numeracji mają w opisie uwagę, że ich aplikacja pokazuje dawny numer wersji zapisany w pliku APK.
+
+## v0.2.5 – Semantic Versioning & Readable Release Titles
+_15.10.2026_
 
 ### Zmieniono
 - Wydania mają numery wersji w formacie v0.X.Y i krótkie angielskie tytuły, np. „v0.2.1 – Clear Connection Errors in the Android App”. Wcześniejsze wydania dostały nowe numery i nazwy według tej samej zasady.
