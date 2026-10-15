@@ -28,21 +28,10 @@ function toast(msg, isErr = false) {
   t.textContent = msg; t.classList.toggle("err", isErr); t.classList.add("show");
   clearTimeout(state.timers.toast); state.timers.toast = setTimeout(() => t.classList.remove("show"), 3200);
 }
-/* Plain-Polish explanation of common model-provider errors; the raw text stays available under "Szczegóły". */
-function explainError(msg) {
-  const m = String(msg || "");
-  const wait = m.match(/retry in (?:(\d+)h)?(?:(\d+)m)?[\d.]+s/i);
-  const when = wait ? ` Limit odnowi się za ok. ${wait[1] ? wait[1] + " h " : ""}${wait[2] ? wait[2] + " min" : "minutę"}.` : "";
-  if (/HTTP 429|RESOURCE_EXHAUSTED|quota/i.test(m)) return `⏳ Wykorzystałeś limit zapytań do tego modelu (darmowy plan ma dzienny limit).${when} Możesz w 🔑 Modele wybrać inny model z listy albo poczekać.`;
-  if (/HTTP 404|NOT_FOUND|model_not_found|no longer available/i.test(m)) return "🔍 Ten model nie istnieje albo został wycofany. W 🔑 Modele kliknij „📋 Wybierz model” i wybierz model z listy.";
-  if (/HTTP 503|UNAVAILABLE|high demand|overloaded|HTTP 529/i.test(m)) return "🔥 Serwery tego modelu są teraz przeciążone (to po stronie dostawcy). Spróbuj za chwilę albo wybierz inny model.";
-  if (/HTTP 401|HTTP 403|API key|PERMISSION_DENIED|UNAUTHENTICATED/i.test(m)) return "🔑 Klucz API jest nieprawidłowy albo nie ma dostępu do tego modelu. Sprawdź klucz w 🔑 Modele.";
-  if (/Cannot reach|timed out|timeout/i.test(m)) return "📶 Serwer nie może połączyć się z dostawcą modelu. Spróbuj ponownie za chwilę.";
-  return null;
-}
+/* explainError() lives in errors.js: one place that turns every known error into plain Polish. */
 function errorView(msg) {
-  const hint = explainError(msg);
-  if (!hint) return [richText("⚠️ " + (msg || "Błąd"))];
+  const hint = explainError(msg) || (msg ? "⚠️ Coś poszło nie tak. Spróbuj ponownie." : "⚠️ Nieznany błąd.");
+  if (!msg) return [el("p", { text: hint })];
   return [el("p", { text: hint }), el("details", {}, el("summary", { text: "Szczegóły" }), el("pre", { text: String(msg) }))];
 }
 /* Safe rich text: escape everything, then allow **bold** and `code` only. */
@@ -107,7 +96,10 @@ async function api(path, { method = "GET", body } = {}) {
   let data = null;
   try { data = await res.json(); } catch { data = null; }
   if (res.status === 401) { showLogin(); throw new Error("Wymagane logowanie"); }
-  if (!res.ok) throw Object.assign(new Error((data && data.error) || `Błąd ${res.status}`), { status: res.status });
+  if (!res.ok) {
+    const raw = (data && data.error) || `Błąd ${res.status}`;
+    throw Object.assign(new Error(explainError(raw) || raw), { status: res.status, raw });
+  }
   return data;
 }
 /* Sleep that ends early when the phone comes back online or the tab becomes visible again. */
@@ -496,7 +488,7 @@ async function loadModels() {
     el("div", { class: "actions" },
       el("button", { class: "btn small", type: "button", text: "Testuj", onclick: async (ev) => {
         ev.target.disabled = true;
-        try { const r = await api(`/providers/${p.id}/test`, { method: "POST", body: {} }); toast(`✅ Działa (${r.model}): ${r.reply}`); } catch (err) { toast("❌ " + (explainError(err.message) || err.message), true); } finally { ev.target.disabled = false; }
+        try { const r = await api(`/providers/${p.id}/test`, { method: "POST", body: {} }); toast(`✅ Działa (${r.model}): ${r.reply}`); } catch (err) { toast("❌ " + err.message, true); } finally { ev.target.disabled = false; }
       } }),
       el("button", { class: "btn small", type: "button", text: "📋 Wybierz model", onclick: (ev) => pickModel(p, data.default, ev.target) }),
       el("button", { class: "btn small", type: "button", text: "Ustaw domyślny", onclick: async () => {
@@ -519,7 +511,7 @@ async function pickModel(p, current, button) {
   item.querySelector(".model-pick")?.remove();
   button.disabled = true;
   let models;
-  try { ({ models } = await api(`/providers/${p.id}/models`)); } catch (err) { toast("❌ " + (explainError(err.message) || err.message), true); return; } finally { button.disabled = false; }
+  try { ({ models } = await api(`/providers/${p.id}/models`)); } catch (err) { toast("❌ " + err.message, true); return; } finally { button.disabled = false; }
   if (!models.length) { toast("Dostawca nie zwrócił listy modeli – wpisz nazwę ręcznie w „Edytuj”.", true); return; }
   const sel = el("select", { "aria-label": "Model" }, ...models.map((m) => el("option", { value: m, text: m, selected: m === p.default_model })));
   const save = el("button", { class: "btn small primary", type: "button", text: "Zapisz", onclick: async () => {
