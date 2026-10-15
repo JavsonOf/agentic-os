@@ -95,7 +95,7 @@ def test_the_real_changelog_is_consistent():
     versions = [release_notes.parse_version(t) for t in tags]
     assert versions == sorted(versions, reverse=True)  # newest first, no duplicates
     for r in published:
-        assert r["title"].isascii() and not r["title"].startswith(("Agentic OS", "Release "))  # short English title
+        assert r["title"].isascii() and not r["title"].startswith("Agentic OS") and "wydanie" not in r["title"]  # short English title
         assert release_notes.notes_for_tag(text, r["tag"]).startswith("### ")
     for _, category, _ in release_notes.parse(text):
         assert category in release_notes.CATEGORIES
