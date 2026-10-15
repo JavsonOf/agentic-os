@@ -47,16 +47,20 @@ jobs:
             echo "name=$version – $title"
           } >> "$GITHUB_OUTPUT"
           echo "APP_VERSION=${version#v}" >> "$GITHUB_ENV"
+          echo "APK_NAME=$(python3 scripts/release_notes.py --apk-name "$version")" >> "$GITHUB_ENV"
           echo "Previous: ${previous:-none} · next: $version – $title · publish: $worth"
           cat release-notes.md
       - name: Build APK
         run: gradle -p android --no-daemon assembleRelease testReleaseUnitTest
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk AgenticOS.apk
+        run: |
+          # AgenticOS_vX.Y.Z.apk on main, AgenticOS.apk for PR builds (no version yet)
+          echo "APK_NAME=${APK_NAME:-AgenticOS.apk}" >> "$GITHUB_ENV"
+          cp android/app/build/outputs/apk/release/app-release.apk "${APK_NAME:-AgenticOS.apk}"
       - uses: actions/upload-artifact@v4
         with:
           name: AgenticOS-apk
-          path: AgenticOS.apk
+          path: ${{ env.APK_NAME }}
       - name: Publish release
         if: steps.notes.outputs.publish == 'yes'
         uses: softprops/action-gh-release@v2
@@ -64,5 +68,5 @@ jobs:
           tag_name: ${{ steps.notes.outputs.version }}
           name: ${{ steps.notes.outputs.name }}
           make_latest: true
-          files: AgenticOS.apk
+          files: ${{ env.APK_NAME }}
           body_path: release-notes.md  # what changed, from CHANGELOG.md

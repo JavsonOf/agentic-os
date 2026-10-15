@@ -1,7 +1,8 @@
 name: release-notes
 
 # Keeps GitHub releases in line with CHANGELOG.md: releases published before SemVer move to their
-# vX.Y.Z tag ("dawniej android-N" lines), and every release gets its title and notes from its section.
+# vX.Y.Z tag ("dawniej android-N" lines), APKs are named AgenticOS_vX.Y.Z.apk, and every release gets its
+# title and notes from its section.
 on:
   push:
     branches: [main]
@@ -38,6 +39,17 @@ jobs:
               gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$old"
               echo "Deleted old tag $old"
             fi
+          done
+      - name: Name APK files after their version
+        run: |
+          # Only the file name changes (AgenticOS.apk -> AgenticOS_vX.Y.Z.apk); the file itself stays the same.
+          for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
+            if ! gh release view "$tag" > /dev/null 2>&1; then continue; fi
+            name=$(python3 scripts/release_notes.py --apk-name "$tag")
+            for id in $(gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq '.assets[] | select(.name == "AgenticOS.apk") | .id'); do
+              gh api -X PATCH "repos/${{ github.repository }}/releases/assets/$id" -f name="$name" > /dev/null
+              echo "Renamed the APK of $tag to $name"
+            done
           done
       - name: Update release titles and notes
         run: |

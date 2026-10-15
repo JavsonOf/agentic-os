@@ -31,6 +31,7 @@ W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title 
 
 ### Drobne zmiany
 - Wydania sprzed zmiany numeracji mają w opisie uwagę, że ich aplikacja pokazuje dawny numer wersji zapisany w pliku APK.
+- Plik aplikacji w każdym wydaniu ma w nazwie numer wersji, np. AgenticOS_v0.2.5.apk. W starszych wydaniach zmieniła się tylko nazwa pliku, sam plik jest ten sam.
 
 ## v0.2.5 – Semantic Versioning & Readable Release Titles
 _15.10.2026_

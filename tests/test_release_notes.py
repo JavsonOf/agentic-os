@@ -105,3 +105,8 @@ def test_releases_from_before_semver_explain_their_old_app_version():
     note = release_notes.old_version_note(NEW, "v0.1.1")
     assert "1.0.2" in note and "wydanie 2" in note
     assert release_notes.old_version_note(NEW + "\n## v0.3.0 – New\n", "v0.3.0") == ""
+
+
+def test_apk_asset_is_named_after_the_release_version():
+    assert release_notes.apk_name("v0.2.1") == "AgenticOS_v0.2.1.apk"
+    assert "**AgenticOS_v0.2.1.apk**" in release_notes.install("v0.2.1")

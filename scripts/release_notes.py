@@ -10,6 +10,7 @@ Releases follow SemVer: tag ``vMAJOR.MINOR.PATCH`` (now ``v0.MINOR.PATCH``) and 
     python scripts/release_notes.py --next-version v0.2.4    version of the next release, e.g. v0.2.5
     python scripts/release_notes.py --next-title v0.2.4      title of the next release
     python scripts/release_notes.py --migrations             "old-tag new-tag" pairs from "dawniej …" lines
+    python scripts/release_notes.py --apk-name v0.2.1        APK asset name, e.g. AgenticOS_v0.2.1.apk
 
 Published releases are sections "## vX.Y.Z – Title" (a line below may say "dawniej android-N"
 for releases published before SemVer). Any other "## ..." heading (normally "Następne wydanie") holds
@@ -32,8 +33,17 @@ TAG_HEADING = re.compile(rf"^##\s+({VERSION})(?:\s+[–—-]\s+(.*))?$")
 OLD_TAG = re.compile(r"dawniej\s+(android-\d+)")
 TITLE_LINE = re.compile(r"^Tytuł:\s*(.+)$")
 BUMP_LINE = re.compile(r"^Wersja:\s*(major|minor|patch)\s*$")
-INSTALL = ("---\n**Instalacja na Androidzie:** otwórz tę stronę na telefonie, dotknij **AgenticOS.apk** i zezwól "
+INSTALL = ("---\n**Instalacja na Androidzie:** otwórz tę stronę na telefonie, dotknij **{apk}** i zezwól "
            "przeglądarce na instalację, gdy zapyta. Nowa wersja instaluje się na poprzedniej.")
+
+
+def apk_name(tag: str) -> str:
+    """File name of the release's APK asset, e.g. AgenticOS_v0.2.1.apk."""
+    return f"AgenticOS_{tag}.apk"
+
+
+def install(tag: str) -> str:
+    return INSTALL.format(apk=apk_name(tag))
 
 
 def parse_version(tag: str) -> tuple[int, int, int] | None:
@@ -176,8 +186,12 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--next-version", metavar="PREVIOUS", help="print the version of the next release")
     group.add_argument("--next-title", metavar="PREVIOUS", help="print the title of the next release")
     group.add_argument("--migrations", action="store_true", help="print 'old-tag new-tag' for releases to rename")
+    group.add_argument("--apk-name", metavar="TAG", help="print the APK asset name of a release")
     parser.add_argument("--changelog", default="CHANGELOG.md")
     args = parser.parse_args(argv)
+    if args.apk_name:
+        sys.stdout.write(apk_name(args.apk_name) + "\n")
+        return 0
     text = Path(args.changelog).read_text(encoding="utf-8")
     if args.migrations:
         sys.stdout.writelines(f"{r['old']} {r['tag']}\n" for r in releases(text) if r["old"])
@@ -187,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.tag:
         note = old_version_note(text, args.tag)
-        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{INSTALL}\n")
+        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{install(args.tag)}\n")
         return 0
     previous_ref = next(v for v in (args.since, args.worth_release, args.next_version, args.next_title) if v is not None)
     previous = file_at(previous_ref) if previous_ref else ""
@@ -198,7 +212,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.next_title is not None:
         sys.stdout.write(next_title(text, previous) + "\n")
     else:
-        sys.stdout.write(f"{notes_since(text, previous)}\n\n{INSTALL}\n")
+        version = next_version(text, previous, git_tags())
+        sys.stdout.write(f"{notes_since(text, previous)}\n\n{install(version)}\n")
     return 0
 
 
