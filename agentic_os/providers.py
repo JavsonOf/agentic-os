@@ -11,6 +11,7 @@ import json
 import os
 import re
 import threading
+import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -43,6 +44,7 @@ class ProviderConfig:
     base_url: str = ""
     default_model: str = ""
     label: str = ""
+    daily_limit: int = 0  # requests per day the owner's plan allows (0 = not set), shown as a usage bar
 
     def public(self) -> dict[str, Any]:
         data = asdict(self)
@@ -69,6 +71,42 @@ class ProviderRegistry:
             with open(path, encoding="utf-8") as fh:
                 for item in json.load(fh):
                     self._items[item["id"]] = ProviderConfig(**item)
+        # requests made today and the last "Testuj" result per provider (no secrets, so a plain file)
+        self._usage_path = os.path.join(os.path.dirname(os.path.abspath(path)), "usage.json") if path else None
+        self._usage: dict[str, dict[str, Any]] = {}
+        if self._usage_path and os.path.exists(self._usage_path):
+            try:
+                with open(self._usage_path, encoding="utf-8") as fh:
+                    self._usage = json.load(fh)
+            except (OSError, ValueError):
+                self._usage = {}
+
+    def _save_usage(self) -> None:
+        if not self._usage_path:
+            return
+        tmp = f"{self._usage_path}.tmp{threading.get_ident()}"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(self._usage, fh)
+        os.replace(tmp, self._usage_path)
+
+    def record_call(self, provider_id: str) -> None:
+        today = time.strftime("%Y-%m-%d")
+        with self._lock:
+            entry = self._usage.setdefault(provider_id, {})
+            if entry.get("date") != today:
+                entry["date"], entry["count"] = today, 0
+            entry["count"] = entry.get("count", 0) + 1
+            self._save_usage()
+
+    def record_test(self, provider_id: str, ok: bool) -> None:
+        with self._lock:
+            self._usage.setdefault(provider_id, {})["last_test"] = {"ok": ok, "at": time.time()}
+            self._save_usage()
+
+    def usage(self, provider_id: str) -> dict[str, Any]:
+        entry = self._usage.get(provider_id, {})
+        today = entry.get("count", 0) if entry.get("date") == time.strftime("%Y-%m-%d") else 0
+        return {"today": today, "last_test": entry.get("last_test")}
 
     def _save(self) -> None:
         if not self.path:
@@ -112,10 +150,21 @@ class ProviderRegistry:
         return list(self._items)
 
     def public(self) -> list[dict[str, Any]]:
-        return [p.public() for p in self._items.values()]
+        return [{**p.public(), "usage": self.usage(p.id)} for p in self._items.values()]
 
     def build(self, provider_id: str, model: str | None = None) -> LLMProvider:
-        """Instantiate an :class:`LLMProvider` for a stored config."""
+        """Instantiate an :class:`LLMProvider` for a stored config; its calls are counted per day."""
+        llm = self._build(provider_id, model)
+        complete = llm.complete
+
+        def counted(*args: Any, **kwargs: Any) -> Any:
+            self.record_call(provider_id)
+            return complete(*args, **kwargs)
+
+        llm.complete = counted  # type: ignore[method-assign]  # same object and type, calls are counted
+        return llm
+
+    def _build(self, provider_id: str, model: str | None = None) -> LLMProvider:
         cfg = self.get(provider_id)
         model = model or cfg.default_model
         if cfg.kind == "anthropic":

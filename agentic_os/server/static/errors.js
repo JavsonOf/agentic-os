@@ -18,7 +18,7 @@ const ERROR_RULES = [
   [/(?:^|: )Brak połączenia z serwerem/, "📶 Brak połączenia z serwerem Agentic OS. Sprawdź internet i czy serwer (np. Codespaces) nadal działa."],
   [/Failed to fetch|NetworkError|Load failed/i, "📶 Brak połączenia z serwerem Agentic OS. Sprawdź internet i czy serwer (np. Codespaces) nadal działa."],
   [/Missing or invalid API key|Wymagane logowanie/, "🔒 Nieprawidłowe hasło do War Room albo sesja wygasła. Zaloguj się ponownie."],
-  [/Przekroczono czas oczekiwania/, "⏱️ Agent pracuje dłużej niż zwykle. Wynik pojawi się w zakładce 📋 Zadania, gdy będzie gotowy."],
+  [/Przekroczono czas oczekiwania/, "⏱️ Agent pracuje dłużej niż zwykle. Wynik pojawi się w zakładce Zadania, gdy będzie gotowy."],
   [/(?:^|: )No route (?:or item )?for /, "🧩 Ta funkcja nie istnieje na serwerze. Serwer ma starszą wersję niż aplikacja – zrób na serwerze git pull i uruchom go ponownie."],
   [/Request body too large|Plik jest za duży/, "📦 Plik albo tekst jest za duży (limit ok. 60 MB). Podziel go na mniejsze części."],
   [/(?:^|: )Invalid JSON|JSON body must be an object/, "🧩 Aplikacja wysłała niepoprawne dane. Odśwież stronę i spróbuj ponownie."],
@@ -31,13 +31,13 @@ const ERROR_RULES = [
 
   /* -------------------------------------------------------------------- MCP servers */
   [/Cannot reach MCP server/, "🧩 Nie można połączyć się z serwerem MCP. Sprawdź jego adres i czy jest uruchomiony."],
-  [/HTTP (\d{3}) from MCP server/, (m) => `🧩 Serwer MCP odpowiedział błędem ${m[1]}${m[1] === "401" || m[1] === "403" ? " – brakuje lub jest zły token dostępu" : ""}. Sprawdź jego ustawienia w 🧩 Rozszerzenia.`],
+  [/HTTP (\d{3}) from MCP server/, (m) => `🧩 Serwer MCP odpowiedział błędem ${m[1]}${m[1] === "401" || m[1] === "403" ? " – brakuje lub jest zły token dostępu" : ""}. Sprawdź jego ustawienia w Ty → Rozszerzenia.`],
   [/MCP server did not answer in time/, "🧩 Serwer MCP nie odpowiedział na czas. Spróbuj ponownie albo uruchom go ponownie."],
-  [/MCP process exited|MCP process is not running|MCP server is not connected/, "🧩 Serwer MCP nie działa. Usuń go i dodaj ponownie w 🧩 Rozszerzenia albo sprawdź jego polecenie."],
+  [/MCP process exited|MCP process is not running|MCP server is not connected/, "🧩 Serwer MCP nie działa. Usuń go i dodaj ponownie w Ty → Rozszerzenia albo sprawdź jego polecenie."],
   [/Cannot start MCP command/, "🧩 Nie da się uruchomić polecenia serwera MCP. Sprawdź, czy program jest zainstalowany na serwerze i czy polecenie jest poprawne."],
   [/MCP server sent no response/, "🧩 Serwer MCP nie zwrócił odpowiedzi. Sprawdź, czy to na pewno serwer MCP."],
   [/MCP error/, "🧩 Serwer MCP zgłosił błąd podczas działania narzędzia."],
-  [/No MCP server/, "🧩 Ten serwer MCP nie istnieje (mógł zostać usunięty). Odśwież zakładkę 🧩 Rozszerzenia."],
+  [/No MCP server/, "🧩 Ten serwer MCP nie istnieje (mógł zostać usunięty). Odśwież zakładkę Ty → Rozszerzenia."],
   [/A stdio MCP server needs a command/, "🧩 Podaj polecenie, które uruchamia serwer MCP (np. npx …)."],
   [/transport must be/, "🧩 Wybierz sposób połączenia z serwerem MCP: http albo stdio."],
 
@@ -61,29 +61,41 @@ const ERROR_RULES = [
 
   /* ------------------------------------------------------------- AI model providers */
   [/google-genai.*required|'anthropic' package is required/, "📦 Na serwerze brakuje biblioteki dla tego modelu. W terminalu serwera uruchom: pip install -e \".[gemini]\" (albo \".[anthropic]\") i uruchom serwer ponownie."],
-  [/A model id is required/, "🤖 Nie podano nazwy modelu. W 🔑 Modele kliknij „📋 Wybierz model” albo wpisz nazwę w „Edytuj”."],
-  [/No provider named|No provider '|Unknown provider/, "🔑 Ten dostawca modeli nie jest skonfigurowany (mógł zostać usunięty). Dodaj go ponownie w 🔑 Modele albo wybierz innego."],
+  [/A model id is required/, "🤖 Nie podano nazwy modelu. W Modele, w sekcji „Wybierz model”, zaznacz model z listy."],
+  [/No provider named|No provider '|Unknown provider/, "🔑 Ten dostawca modeli nie jest skonfigurowany (mógł zostać usunięty). Dodaj go ponownie w Modele albo wybierz innego."],
   [/context.{0,20}(length|window)|too many tokens|maximum context|prompt is too long|input.{0,20}too long|exceeds the maximum/i,
     "📏 Rozmowa jest za długa dla tego modelu. Kliknij „Nowa rozmowa” albo wybierz model z większym kontekstem."],
   [/credit balance is too low|insufficient[_ ](quota|funds|balance)|\b402\b|billing/i,
     "💳 Na koncie dostawcy brakuje środków albo płatność nie jest skonfigurowana. Sprawdź rozliczenia u dostawcy (np. Google AI Studio → API keys → Set up billing)."],
   [/RESOURCE_EXHAUSTED|quota|rate[_ ]?limit|Too Many Requests|\b429\b/i, (m, t) => /free_tier|per day|PerDay/i.test(t) || /retry in \d+h/i.test(t)
-    ? `⏳ Wykorzystałeś dzienny limit darmowego planu dla tego modelu.${_waitText(t)} Możesz w 🔑 Modele wybrać inny model albo włączyć płatny plan u dostawcy.`
+    ? `⏳ Wykorzystałeś dzienny limit darmowego planu dla tego modelu.${_waitText(t)} Możesz w Modele wybrać inny model albo włączyć płatny plan u dostawcy.`
     : `⏳ Za dużo zapytań w krótkim czasie – dostawca chwilowo blokuje kolejne.${_waitText(t) || " Odczekaj chwilę i spróbuj ponownie."}`],
   [/model.{0,40}(not found|does not exist|no longer available|not supported|is not found)|model_not_found|NOT_FOUND|not_found_error|\b404\b.{0,80}(googleapis|openai|anthropic|models)/i,
-    "🔍 Ten model nie istnieje, został wycofany albo nie jest dostępny dla Twojego klucza. W 🔑 Modele kliknij „📋 Wybierz model” i wybierz model z listy."],
+    "🔍 Ten model nie istnieje, został wycofany albo nie jest dostępny dla Twojego klucza. W Modele, w sekcji „Wybierz model”, zaznacz inny model z listy."],
   [/API[_ ]?key.{0,30}(invalid|not valid|expired)|API_KEY_INVALID|invalid[_ ]api[_ ]key|incorrect api key|authentication_error|UNAUTHENTICATED|\b401\b/i,
-    "🔑 Klucz API jest nieprawidłowy albo wygasł. Wklej poprawny klucz w 🔑 Modele → Edytuj."],
+    "🔑 Klucz API jest nieprawidłowy albo wygasł. Wklej poprawny klucz w Modele → Edytuj klucz i limit."],
   [/PERMISSION_DENIED|permission_error|\b403\b/i, "🔑 Klucz API nie ma dostępu do tego modelu lub usługi. Sprawdź uprawnienia klucza u dostawcy albo wybierz inny model."],
   [/high demand|overloaded|UNAVAILABLE|\b503\b|\b529\b/i, "🔥 Serwery tego modelu są teraz przeciążone (to po stronie dostawcy, nie Twojej). Spróbuj za chwilę albo wybierz inny model."],
   [/SAFETY|content[_ ]filter|blocked by|PROHIBITED_CONTENT|"refusal"|stop_reason.{0,5}refusal/i, "🛡️ Dostawca zablokował odpowiedź przez swoje filtry bezpieczeństwa. Spróbuj sformułować prośbę inaczej."],
-  [/Cannot reach (https?:\/\/(?!localhost)[^:\s]+)/, (m) => `📶 Serwer Agentic OS nie może połączyć się z ${m[1].replace(/^https?:\/\//, "").split("/")[0]}. Sprawdź internet serwera albo adres dostawcy w 🔑 Modele.`],
-  [/Non-JSON reply from/, "🧩 Dostawca odpowiedział w nieoczekiwany sposób. Sprawdź adres API (base_url) w 🔑 Modele → Edytuj."],
+  [/Cannot reach (https?:\/\/(?!localhost)[^:\s]+)/, (m) => `📶 Serwer Agentic OS nie może połączyć się z ${m[1].replace(/^https?:\/\//, "").split("/")[0]}. Sprawdź internet serwera albo adres dostawcy w Modele.`],
+  [/Non-JSON reply from/, "🧩 Dostawca odpowiedział w nieoczekiwany sposób. Sprawdź adres API (base_url) w Modele → Edytuj klucz i limit."],
   [/HTTP 5\d\d from|\b50[0-24]\b.{0,40}(Internal|Bad Gateway|Gateway Timeout|INTERNAL)/i, "🔥 Dostawca modelu ma awarię po swojej stronie. Spróbuj ponownie za chwilę."],
   [/HTTP 400 from|INVALID_ARGUMENT|invalid_request_error/, "🧩 Dostawca odrzucił zapytanie jako niepoprawne (np. ten model nie obsługuje narzędzi). Spróbuj innego modelu z listy."],
   [/timed out|timeout|DEADLINE_EXCEEDED/i, "⏱️ Model nie odpowiedział w wyznaczonym czasie. Spróbuj ponownie albo wybierz szybszy model."],
   [/(?:^|: )Provider error:/, "🤖 Dostawca modelu zgłosił błąd. Spróbuj ponownie albo wybierz inny model."],
-  [/ScriptedLLM ran out/, "🧪 Testowy model skończył przygotowane odpowiedzi. Dodaj prawdziwy model w 🔑 Modele."],
+  [/ScriptedLLM ran out/, "🧪 Testowy model skończył przygotowane odpowiedzi. Dodaj prawdziwy model w Modele."],
+
+  /* ------------------------------------------------------- knowledge files and schedules */
+  [/Unsupported file type: \.(\w*)/, (m) => `📄 Nie umiem odczytać plików .${m[1] || "?"}. Dodaj PDF, DOCX, TXT, MD, CSV albo JSON.`],
+  [/DOCX file is damaged/, "📄 Ten plik DOCX jest uszkodzony albo to nie jest dokument Worda. Zapisz go ponownie i spróbuj jeszcze raz."],
+  [/No readable text in this PDF/, "📄 W tym PDF nie ma tekstu do odczytania (to pewnie skan albo zdjęcia). Dodaj wersję tekstową albo wklej treść."],
+  [/This PDF cannot be read/, "📄 Tego pliku PDF nie da się odczytać (może jest uszkodzony albo zabezpieczony hasłem)."],
+  [/A schedule needs a 'task'/, "🗓️ Wpisz, co agent ma zrobić."],
+  [/'time' must look like HH:MM/, "🗓️ Podaj godzinę w formacie GG:MM, np. 07:30."],
+  [/'days' must be one of/, "🗓️ Wybierz, kiedy zadanie ma się powtarzać."],
+  [/No schedule /, "🗓️ To zaplanowane zadanie już nie istnieje. Odśwież zakładkę Zadania."],
+  [/No document /, "📚 Tego dokumentu już nie ma w wiedzy. Odśwież zakładkę Wiedza."],
+  [/'daily_limit' must be a whole number/, "✏️ Dzienny limit zapytań musi być liczbą całkowitą (albo zostaw puste)."],
 
   /* ----------------------------------------------------------------- form validation */
   [/'([^']+)' is required/, (m) => `✏️ Uzupełnij pole „${FIELD_NAMES[m[1]] || m[1]}”.`],

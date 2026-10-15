@@ -21,6 +21,7 @@ import uuid
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from agentic_os.agents.base import DEFAULT_INSTRUCTIONS, Agent
@@ -44,6 +45,7 @@ from agentic_os.planning import PlanError, extract_json
 from agentic_os.prompts import PromptStrategy, default_strategies
 from agentic_os.providers import ProviderRegistry
 from agentic_os.rag.pipeline import Document, RAGPipeline
+from agentic_os.schedules import Schedule, ScheduleStore
 from agentic_os.skills import Skill, SkillRegistry
 from agentic_os.tools.builtin import builtin_tools
 from agentic_os.tools.registry import Tool, ToolRegistry, make_tool
@@ -88,6 +90,8 @@ class Process:
     started_at: float | None = None
     finished_at: float | None = None
     strategy: str | None = None  # prompt strategy an adaptive agent picked for this run
+    step: int = 0  # model turns taken so far (live progress for the War Room)
+    max_steps: int = 0
     _future: Future | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
@@ -102,6 +106,8 @@ class Process:
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "strategy": self.strategy,
+            "step": self.step,
+            "max_steps": self.max_steps,
         }
 
 
@@ -126,7 +132,9 @@ class Approval:
 
     def public(self) -> dict[str, Any]:
         return {"id": self.id, "kind": self.kind, "pid": self.pid, "agent": self.agent, "tool": self.tool,
-                "arguments": self.arguments, "created_at": self.created_at}
+                "arguments": self.arguments, "created_at": self.created_at,
+                "expires_at": self.created_at + APPROVAL_TIMEOUT,
+                "expires_in": max(0.0, round(self.created_at + APPROVAL_TIMEOUT - time.time(), 1))}
 
 
 class _LayeredRegistry(ToolRegistry):
@@ -256,6 +264,8 @@ class AgenticOS:
         for mod in self.mods.all():
             if mod.enabled:
                 self.tools.register(mod.to_tool())
+        self.schedules = ScheduleStore(self._path("schedules.json"))
+        self._scheduler_stop: threading.Event | None = None
         self.mcp: dict[str, MCPClient] = {}
         self.agents: dict[str, Agent | ExternalAgent] = {}
         self.processes: dict[str, Process] = {}
@@ -781,6 +791,20 @@ class AgenticOS:
         return wrap(func) if func is not None else wrap
 
     # ------------------------------------------------------------ knowledge
+    def remove_document(self, doc_id: str) -> bool:
+        """Delete a document from the knowledge base (and from the saved copy)."""
+        found = self.knowledge.remove_document(doc_id) > 0
+        path = self._path("knowledge.jsonl")
+        if path and os.path.exists(path):
+            with self._lock, open(path, encoding="utf-8") as fh:
+                kept = [line for line in fh if line.strip() and json.loads(line).get("id") != doc_id]
+            with self._lock:
+                tmp = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
+                with open(tmp, "w", encoding="utf-8") as fh:
+                    fh.writelines(kept)
+                os.replace(tmp, path)
+        return found
+
     def ingest(self, content: str | Document, **metadata: Any) -> int:
         """Add a document (text, ``Document`` or file path) to the knowledge base. Returns chunk count."""
         if isinstance(content, Document):
@@ -824,7 +848,15 @@ class AgenticOS:
         proc.status, proc.started_at = "running", time.time()
         self._local.pid = proc.pid
         try:
-            result = self._with_mode(proc, runner or self.agents[proc.agent]).run(proc.task, context=context)
+            runner = runner or self.agents[proc.agent]
+            if isinstance(runner, Agent):
+                runner = copy.copy(runner)  # report live progress on this run only
+
+                def progress(step: int, limit: int) -> None:
+                    proc.step, proc.max_steps = step, limit
+
+                runner.on_step = progress
+            result = self._with_mode(proc, runner).run(proc.task, context=context)
             proc.result = result.to_dict()
             if proc.strategy:
                 proc.result["strategy"] = proc.strategy
@@ -878,10 +910,12 @@ class AgenticOS:
             raise AgenticOSError(f"No process {pid!r}") from None
 
     def ps(self) -> list[dict[str, Any]]:
-        return [
-            {k: v for k, v in p.to_dict().items() if k != "result"}
-            for p in sorted(self.processes.values(), key=lambda p: p.created_at)
-        ]
+        rows = []
+        for p in sorted(self.processes.values(), key=lambda p: p.created_at):
+            row = {k: v for k, v in p.to_dict().items() if k != "result"}
+            row["output"] = str((p.result or {}).get("output") or "")[:300]  # preview for the task list
+            rows.append(row)
+        return rows
 
     def give_feedback(self, pid: str, reward: float, comment: str = "") -> None:
         """Record a reward in [-1, 1] for a finished process (human feedback)."""
@@ -972,7 +1006,44 @@ class AgenticOS:
             "approvals": len(self.approvals),
         }
 
+    # ------------------------------------------------------------ schedules
+    def add_schedule(self, schedule: Schedule) -> Schedule:
+        self.agent(schedule.agent)  # fail early on an unknown agent
+        return self.schedules.add(schedule)
+
+    def run_schedule(self, sid: str, now: datetime | None = None) -> Process:
+        """Start one scheduled task right away."""
+        s = self.schedules.get(sid)
+        proc = self.submit(s.task, agent=s.agent)
+        self.schedules.mark_run(sid, proc.pid, now or datetime.now(timezone.utc))
+        return proc
+
+    def run_due_schedules(self, now: datetime | None = None) -> list[Process]:
+        """Start every enabled schedule whose time has come today and that has not run yet."""
+        now = now or datetime.now(timezone.utc)
+        started = []
+        for s in self.schedules.due(now):
+            try:
+                started.append(self.run_schedule(s.id, now))
+            except Exception:  # noqa: BLE001 - one broken schedule (e.g. a deleted agent) must not stop the rest
+                self.schedules.mark_run(s.id, "", now)
+        return started
+
+    def start_scheduler(self, interval: float = 30.0) -> None:
+        """Check schedules in a background thread until :meth:`shutdown`."""
+        if self._scheduler_stop is not None:
+            return
+        stop = self._scheduler_stop = threading.Event()
+
+        def loop() -> None:
+            while not stop.wait(interval):
+                self.run_due_schedules()
+
+        threading.Thread(target=loop, name="agentic-os-scheduler", daemon=True).start()
+
     def shutdown(self, wait: bool = True) -> None:
+        if self._scheduler_stop is not None:
+            self._scheduler_stop.set()
         for client in self.mcp.values():
             client.close()
         self._executor.shutdown(wait=wait)
