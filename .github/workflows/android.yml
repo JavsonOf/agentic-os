@@ -2,8 +2,7 @@ name: android
 
 on:
   push:
-    branches: [main]
-    paths: ["android/**", ".github/workflows/android.yml"]
+    branches: [main]  # every merged change gets its own release with notes from CHANGELOG.md
   pull_request:
     paths: ["android/**", ".github/workflows/android.yml"]
   workflow_dispatch:

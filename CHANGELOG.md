@@ -5,12 +5,16 @@ zmieniło dla użytkownika, ale nie podają szczegółów technicznych, adresów
 mogłyby komuś pomóc w ataku.
 
 Nowe zmiany dopisuj w sekcji **Następne wydanie**, w jednej z kategorii: Dodano, Zmieniono, Usunięto,
-Naprawiono, Ulepszono. Przy publikacji wydania automat sam wybiera punkty, których nie było w poprzednim.
+Naprawiono, Ulepszono. Każda scalona zmiana tworzy nowe wydanie, a automat sam wybiera do niego punkty,
+których nie było w poprzednim.
 
 ## Następne wydanie
 
 ### Dodano
 - Każde wydanie na GitHubie ma teraz opis po polsku: co dodano, co zmieniono, co usunięto, jakie błędy naprawiono i co ulepszono.
+
+### Zmieniono
+- Nowe wydanie powstaje po każdej zmianie w Agentic OS, a nie tylko po zmianach w aplikacji na Androida.
 
 ## android-9 · 15.10.2026
 
