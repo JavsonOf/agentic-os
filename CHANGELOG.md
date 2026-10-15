@@ -14,7 +14,10 @@ mogłyby komuś pomóc w ataku.
 - Tytuł wydania jest po angielsku, bo repozytorium jest publiczne: `vX.Y.Z – Krótki opis najważniejszej zmiany`,
   np. `v0.2.1 – Clear Connection Errors in the Android App`. Bez „Agentic OS” i „Release”. Opisy zmian
   zostają po polsku.
-- Wersje testowe, gdyby były potrzebne: `v0.3.0-beta.1`, `v1.0.0-rc.1`.
+- Wersje testowe (np. żeby sprawdzić, czy nowy plik APK się instaluje) mają przyrostek po numerze:
+  `v0.3.0-alpha.1` (wczesna próba), `v0.3.0-beta.1` (funkcje gotowe, szukanie błędów), `v1.0.0-rc.1`
+  (kandydat na wydanie: jeśli nie ma błędów, staje się `v1.0.0`). Są oznaczone na GitHubie jako
+  „Pre-release” i nigdy nie stają się „Latest”, więc zwykła instalacja ich nie pobiera.
 
 ## Jak dopisywać zmiany
 
@@ -26,11 +29,15 @@ najbliższego prawdziwego wydania. Nowa wersja aplikacji na Androida zawsze dost
 
 W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title Case, np. „QR Code Pairing”). Numer wersji automat wylicza sam
 (MINOR, gdy jest coś w Dodano, inaczej PATCH). Linia `Wersja: major` albo `Wersja: minor` wymusza inny skok.
+Linia `Wersja: alpha`, `Wersja: beta` albo `Wersja: rc` robi z wydania wersję testową następnego numeru
+(`v0.3.0-beta.1`, przy kolejnym scaleniu `v0.3.0-beta.2`), a `Wersja: major rc` daje `v1.0.0-rc.1`. Gdy usuniesz
+tę linię, następne scalenie wyda wersję stabilną z tym samym numerem (`v0.3.0`).
 
 ## Następne wydanie
 
 ### Drobne zmiany
 - Wydania sprzed zmiany numeracji mają w opisie uwagę, że ich aplikacja pokazuje dawny numer wersji zapisany w pliku APK.
+- Można wydawać wersje testowe alpha, beta i rc (np. v0.3.0-beta.1) oznaczone jako „Pre-release”.
 - Plik aplikacji w każdym wydaniu ma w nazwie numer wersji, np. AgenticOS_v0.2.5.apk. W starszych wydaniach zmieniła się tylko nazwa pliku, sam plik jest ten sam.
 
 ## v0.2.5 – Semantic Versioning & Readable Release Titles

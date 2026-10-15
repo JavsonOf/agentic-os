@@ -110,3 +110,16 @@ def test_releases_from_before_semver_explain_their_old_app_version():
 def test_apk_asset_is_named_after_the_release_version():
     assert release_notes.apk_name("v0.2.1") == "AgenticOS_v0.2.1.apk"
     assert "**AgenticOS_v0.2.1.apk**" in release_notes.install("v0.2.1")
+
+
+def test_test_builds_get_alpha_beta_rc_suffixes_and_the_stable_release_keeps_their_number():
+    beta = NEW.replace("Tytuł: New", "Wersja: beta\nTytuł: New")
+    assert release_notes.next_version(beta, OLD, []) == "v0.2.0-beta.1"
+    assert release_notes.next_version(beta, OLD, ["v0.2.0-beta.1"]) == "v0.2.0-beta.2"
+    rc = NEW.replace("Tytuł: New", "Wersja: rc\nTytuł: New")
+    assert release_notes.next_version(rc, OLD, ["v0.2.0-beta.2"]) == "v0.2.0-rc.1"
+    fixes_only = NEW.replace("- Nowa rzecz.\n", "")
+    assert release_notes.next_version(fixes_only, OLD, ["v0.2.0-rc.1"]) == "v0.2.0"  # not v0.1.2
+    first_stable = NEW.replace("Tytuł: New", "Wersja: major rc\nTytuł: New")
+    assert release_notes.next_version(first_stable, OLD, []) == "v1.0.0-rc.1"
+    assert release_notes.next_version(NEW, OLD, ["v1.0.0-rc.1"]) == "v1.0.0"
