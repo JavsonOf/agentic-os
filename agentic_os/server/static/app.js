@@ -90,21 +90,32 @@ async function api(path, { method = "GET", body } = {}) {
   let data = null;
   try { data = await res.json(); } catch { data = null; }
   if (res.status === 401) { showLogin(); throw new Error("Wymagane logowanie"); }
-  if (!res.ok) throw new Error((data && data.error) || `Błąd ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error((data && data.error) || `Błąd ${res.status}`), { status: res.status });
   return data;
 }
-async function waitForProcess(pid, onTick) {
-  // The agent keeps working on the server, so a dropped poll is retried instead of losing the answer.
-  for (let i = 0, offline = 0; i < 600; i++) {
+/* Sleep that ends early when the phone comes back online or the tab becomes visible again. */
+function napUntilBack(ms) {
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); window.removeEventListener("online", done); document.removeEventListener("visibilitychange", onVisible); resolve(); };
+    const onVisible = () => { if (document.visibilityState === "visible") done(); };
+    const timer = setTimeout(done, ms);
+    window.addEventListener("online", done); document.addEventListener("visibilitychange", onVisible);
+  });
+}
+async function waitForProcess(pid, onTick, onOffline) {
+  // The agent keeps working on the server, so lost connections are waited out instead of losing the answer.
+  for (let polls = 0; polls < 600;) {
     let p;
-    try { p = await api(`/processes/${pid}`); offline = 0; } catch (err) {
-      if (!err.network || ++offline > 40) throw err;
-      await new Promise((r) => setTimeout(r, 3000));
+    try { p = await api(`/processes/${pid}`); } catch (err) {
+      if (!err.network) throw err;
+      if (onOffline) onOffline();
+      await napUntilBack(4000);
       continue;
     }
+    polls++;
     if (onTick) onTick(p);
     if (p.status === "completed" || p.status === "failed") return p;
-    await new Promise((r) => setTimeout(r, i < 10 ? 700 : 1500));
+    await new Promise((r) => setTimeout(r, polls < 10 ? 700 : 1500));
   }
   throw new Error("Przekroczono czas oczekiwania");
 }
@@ -199,27 +210,76 @@ function renderAgentReply(node, proc) {
   }
   node.append(el("div", { class: "meta" }, `${r.agent || ""}${r.strategy ? ` · 🎯 styl: ${STRATEGIES[r.strategy] || r.strategy}` : ""} · kroki: ${r.steps || 1}${usage.input_tokens ? ` · tokeny: ${usage.input_tokens + usage.output_tokens}` : ""}`, fb));
 }
+/* The conversation is kept in this browser so a reload, a dropped connection or a closed tab never loses an answer. */
+const CHAT_KEEP = 60;
+const followed = new Set();
+function chatKey(agent) { return `aos_chat_${agent}_${sessionId(agent)}`; }
+function loadChat(agent) { try { return JSON.parse(store.get(chatKey(agent), "[]")) || []; } catch { return []; } }
+function saveChat(agent, entries) {
+  let keep = entries.slice(-CHAT_KEEP);
+  // Drop the oldest messages when the browser storage is full.
+  while (keep.length) { store.set(chatKey(agent), JSON.stringify(keep)); if (store.get(chatKey(agent)) === JSON.stringify(keep)) return; keep = keep.slice(Math.ceil(keep.length / 4)); }
+}
+function updateChat(agent, fn) { const entries = loadChat(agent); fn(entries); saveChat(agent, entries); }
+function compactProc(p) {
+  const r = p.result || {};
+  const clip = (v) => { const t = typeof v === "string" ? v : JSON.stringify(v); return t && t.length > 1500 ? t.slice(0, 1500) + "…" : t; };
+  return { pid: p.pid, status: p.status, error: p.error, result: { output: r.output, agent: r.agent, strategy: r.strategy, steps: r.steps, usage: r.usage,
+    citations: r.citations, reflection: r.reflection, tool_calls: (r.tool_calls || []).map((c) => ({ tool: c.tool, arguments: c.arguments, result: clip(c.result) })) } };
+}
+function followReply(agent, pid, node) {
+  if (followed.has(pid)) return;
+  followed.add(pid);
+  const offline = () => { if (node.isConnected) { node.classList.add("thinking"); node.textContent = "📶 Brak połączenia – agent pracuje dalej, pokażę odpowiedź, gdy wróci sieć…"; } };
+  const back = () => { if (node.isConnected && node.textContent.startsWith("📶")) node.textContent = "Myślę…"; };
+  waitForProcess(pid, back, offline).catch((err) => ({ pid, status: "failed",
+    error: err.status === 404 ? "Ta odpowiedź przepadła (serwer został uruchomiony ponownie). Wyślij pytanie jeszcze raz." : err.message }))
+    .then((done) => {
+      followed.delete(pid);
+      updateChat(agent, (entries) => { const e = entries.find((x) => x.pid === pid); if (e) e.done = compactProc(done); });
+      if (node.isConnected) { renderAgentReply(node, done); chatLog.scrollTop = chatLog.scrollHeight; }
+    });
+}
+function renderChat() {
+  const agent = $("#chat-agent").value || store.get("aos_chat_agent", "assistant");
+  const entries = loadChat(agent);
+  if (!entries.length) { chatEmpty(); return; }
+  chatLog.replaceChildren();
+  for (const e of entries) {
+    if (e.role === "user") { addMsg("user", e.text); continue; }
+    const node = addMsg("agent thinking", e.pid ? "Myślę…" : "⚠️ " + (e.error || "Błąd"));
+    if (e.done) renderAgentReply(node, e.done);
+    else if (e.pid) followReply(agent, e.pid, node);
+    else node.classList.remove("thinking");
+  }
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
 $("#chat-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const ta = $("#chat-text"); const text = ta.value.trim(); if (!text) return;
   const agent = $("#chat-agent").value || "assistant";
   ta.value = ""; ta.style.height = "";
   addMsg("user", text);
+  updateChat(agent, (entries) => entries.push({ role: "user", text }));
   const reply = addMsg("agent thinking", "Myślę…");
+  let proc;
   try {
-    const proc = await api("/chat", { method: "POST", body: { message: text, agent, session: sessionId(agent), async: true } });
-    const done = await waitForProcess(proc.pid);
-    renderAgentReply(reply, done);
-  } catch (err) { reply.classList.remove("thinking"); reply.textContent = "⚠️ " + err.message; }
-  chatLog.scrollTop = chatLog.scrollHeight;
+    proc = await api("/chat", { method: "POST", body: { message: text, agent, session: sessionId(agent), async: true } });
+  } catch (err) {
+    reply.classList.remove("thinking"); reply.textContent = "⚠️ " + err.message + (err.network ? " – wiadomość nie dotarła, wyślij ją ponownie." : "");
+    updateChat(agent, (entries) => entries.push({ role: "agent", error: reply.textContent.slice(2) }));
+    return;
+  }
+  updateChat(agent, (entries) => entries.push({ role: "agent", pid: proc.pid }));
+  followReply(agent, proc.pid, reply);
 });
 $("#chat-text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.innerWidth > 900) { e.preventDefault(); $("#chat-form").requestSubmit(); } });
 $("#chat-text").addEventListener("input", (e) => { e.target.style.height = ""; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; });
-$("#chat-agent").addEventListener("change", (e) => { store.set("aos_chat_agent", e.target.value); syncChatPermission(); chatEmpty(); });
+$("#chat-agent").addEventListener("change", (e) => { store.set("aos_chat_agent", e.target.value); syncChatPermission(); renderChat(); });
 $("#chat-reset").addEventListener("click", async () => {
   const agent = $("#chat-agent").value;
   try { await api("/chat/reset", { method: "POST", body: { agent, session: sessionId(agent) } }); } catch { /* ignore */ }
-  store.del("aos_session_" + agent); chatEmpty(); toast("Nowa rozmowa");
+  store.del(chatKey(agent)); store.del("aos_session_" + agent); chatEmpty(); toast("Nowa rozmowa");
 });
 $("#offline-fix").addEventListener("click", () => showTab("models"));
 function chatEmpty() { chatLog.replaceChildren(el("div", { class: "empty" }, el("div", { text: "👋 Napisz, co mam zrobić." }), el("div", { class: "small", text: "Agent użyje narzędzi, pamięci i Twojej bazy wiedzy." }))); }
@@ -238,7 +298,7 @@ async function loadAgents() {
     agentTraits(a),
     a.learning ? el("p", { class: "small", text: "📈 " + Object.entries(a.learning.strategies).map(([k, v]) => `${STRATEGIES[k] || k}: ${v.pulls ? `${v.mean_reward > 0 ? "+" : ""}${v.mean_reward} (${v.pulls}×)` : "–"}`).join(" · ") + (a.learning.best ? ` → najlepszy: ${STRATEGIES[a.learning.best] || a.learning.best}` : "") }) : null,
     el("div", { class: "actions" },
-      el("button", { class: "btn small", type: "button", text: "💬 Czat", onclick: () => { $("#chat-agent").value = a.name; store.set("aos_chat_agent", a.name); chatEmpty(); showTab("chat"); } }),
+      el("button", { class: "btn small", type: "button", text: "💬 Czat", onclick: () => { $("#chat-agent").value = a.name; store.set("aos_chat_agent", a.name); renderChat(); showTab("chat"); } }),
       a.name !== "assistant" ? el("button", { class: "btn small ghost danger", type: "button", text: "Usuń", onclick: async () => {
         if (!confirm(`Usunąć agenta ${a.name}?`)) return;
         try { await api(`/agents/${a.name}`, { method: "DELETE" }); toast("Usunięto"); loadAgents(); } catch (err) { toast(err.message, true); }
@@ -526,6 +586,7 @@ async function start() {
   $("#login").classList.add("hidden"); $("#app").classList.remove("hidden");
   chatEmpty();
   try { await Promise.all([refreshAgents(), refreshProviders()]); } catch (err) { toast(err.message, true); }
+  renderChat();
   showTab(store.get("aos_tab", "chat"));
   pollApprovals();
 }
