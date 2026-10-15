@@ -94,6 +94,18 @@ def notes_for_tag(text: str, tag: str) -> str:
     return render([(c, p) for t, c, p in parse(text) if t == tag])
 
 
+def old_version_note(text: str, tag: str) -> str:
+    """For releases published before SemVer: the APK still reports the build number it was built with."""
+    old = next((r["old"] for r in releases(text) if r["tag"] == tag), "")
+    if not old:
+        return ""
+    build = old.split("-", 1)[1]
+    return (f"> **Uwaga:** to wydanie powstało przed wprowadzeniem numerów wersji vX.Y.Z i wcześniej nazywało się "
+            f"„wydanie {build}”. Aplikacja z tego wydania pokazuje w ustawieniach Androida dawny numer wersji "
+            f"**1.0.{build}**, bo jest on zapisany w samym pliku APK podczas budowania i nie da się go zmienić bez "
+            f"zbudowania aplikacji od nowa. To ten sam plik co wcześniej, zmieniła się tylko nazwa wydania.")
+
+
 def title_for_tag(text: str, tag: str) -> str:
     return next((r["title"] for r in releases(text) if r["tag"] == tag), "")
 
@@ -174,7 +186,8 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(title_for_tag(text, args.title) + "\n")
         return 0
     if args.tag:
-        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{INSTALL}\n")
+        note = old_version_note(text, args.tag)
+        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{INSTALL}\n")
         return 0
     previous_ref = next(v for v in (args.since, args.worth_release, args.next_version, args.next_title) if v is not None)
     previous = file_at(previous_ref) if previous_ref else ""

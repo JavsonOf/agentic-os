@@ -99,3 +99,9 @@ def test_the_real_changelog_is_consistent():
         assert release_notes.notes_for_tag(text, r["tag"]).startswith("### ")
     for _, category, _ in release_notes.parse(text):
         assert category in release_notes.CATEGORIES
+
+
+def test_releases_from_before_semver_explain_their_old_app_version():
+    note = release_notes.old_version_note(NEW, "v0.1.1")
+    assert "1.0.2" in note and "wydanie 2" in note
+    assert release_notes.old_version_note(NEW + "\n## v0.3.0 – New\n", "v0.3.0") == ""
