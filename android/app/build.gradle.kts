@@ -34,6 +34,10 @@ android {
         }
     }
 
+    lint {
+        checkReleaseBuilds = false  // lint pulls in many extra downloads; run `gradle lint` on demand
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
