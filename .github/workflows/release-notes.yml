@@ -1,7 +1,7 @@
 name: release-notes
 
-# Writes the notes from CHANGELOG.md into the GitHub releases that have their own section there,
-# so editing CHANGELOG.md on main also updates releases that were published earlier.
+# Gives every GitHub release its Polish/English name and writes the notes from CHANGELOG.md into the
+# releases that have their own section there, so editing CHANGELOG.md on main also updates older releases.
 on:
   push:
     branches: [main]
@@ -16,16 +16,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update release descriptions
+      - name: Update release names and descriptions
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for tag in $(grep -oE '^## android-[0-9]+' CHANGELOG.md | cut -c4-); do
-            if gh release view "$tag" > /dev/null 2>&1; then
+          # Every release gets the Polish/English name; releases with a CHANGELOG.md section also get its notes.
+          for tag in $(gh release list --limit 200 --json tagName --jq '.[].tagName' | grep -E '^android-[0-9]+$'); do
+            n=${tag#android-}
+            args=(--title "Agentic OS – wydanie $n · Release $n")
+            if grep -qE "^## $tag( |$)" CHANGELOG.md; then
               python3 scripts/release_notes.py --tag "$tag" > notes.md
-              gh release edit "$tag" --notes-file notes.md
-              echo "Updated $tag"
-            else
-              echo "No release $tag, skipped"
+              args+=(--notes-file notes.md)
             fi
+            gh release edit "$tag" "${args[@]}"
+            echo "Updated $tag"
           done

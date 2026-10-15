@@ -12,11 +12,18 @@ najbliższego prawdziwego wydania. Nowa wersja aplikacji na Androida zawsze dost
 
 ## Następne wydanie
 
-### Dodano
-- Każde wydanie na GitHubie ma teraz opis po polsku: co dodano, co zmieniono, co usunięto, jakie błędy naprawiono i co ulepszono.
+### Zmieniono
+- Nazwy wydań na GitHubie są teraz po polsku i angielsku, np. „Agentic OS – wydanie 14 · Release 14”.
+
+## android-14 · 15.10.2026
 
 ### Zmieniono
 - Nowe wydanie powstaje po każdej ważnej zmianie w Agentic OS, a nie tylko po zmianach w aplikacji na Androida. Drobiazgi trafiają do opisu najbliższego wydania zamiast tworzyć osobne.
+
+## android-11 · 15.10.2026
+
+### Dodano
+- Każde wydanie na GitHubie ma teraz opis po polsku: co dodano, co zmieniono, co usunięto, jakie błędy naprawiono i co ulepszono.
 
 ## android-9 · 15.10.2026
 

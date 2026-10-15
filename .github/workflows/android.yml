@@ -49,7 +49,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-${{ github.run_number }}
-          name: Agentic OS for Android (build ${{ github.run_number }})
+          name: Agentic OS – wydanie ${{ github.run_number }} · Release ${{ github.run_number }}
           make_latest: true
           files: AgenticOS.apk
           body_path: release-notes.md  # what changed, from CHANGELOG.md
