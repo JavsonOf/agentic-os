@@ -37,9 +37,15 @@ tę linię, następne scalenie wyda wersję stabilną z tym samym numerem (`v0.3
 ## Następne wydanie
 
 ### Drobne zmiany
-- Wydania sprzed zmiany numeracji mają w opisie uwagę, że ich aplikacja pokazuje dawny numer wersji zapisany w pliku APK.
+- Zmiana samej instrukcji aplikacji na Androida nie tworzy już nowego wydania.
+
+## v0.2.6 – Versioned APK File Names & Test Builds
+_15.10.2026_
+
+### Zmieniono
+- Plik aplikacji w każdym wydaniu ma w nazwie numer wersji, np. AgenticOS_v0.2.6.apk. W starszych wydaniach zmieniła się tylko nazwa pliku, sam plik jest ten sam.
 - Można wydawać wersje testowe alpha, beta i rc (np. v0.3.0-beta.1) oznaczone jako „Pre-release”.
-- Plik aplikacji w każdym wydaniu ma w nazwie numer wersji, np. AgenticOS_v0.2.5.apk. W starszych wydaniach zmieniła się tylko nazwa pliku, sam plik jest ten sam.
+- Wydania sprzed zmiany numeracji mają w opisie uwagę, że ich aplikacja pokazuje dawny numer wersji zapisany w pliku APK.
 
 ## v0.2.5 – Semantic Versioning & Readable Release Titles
 _15.10.2026_

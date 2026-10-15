@@ -42,7 +42,8 @@ jobs:
           python3 scripts/release_notes.py --since "$stable" > release-notes.md
           # A release only for real changes (or a new app build); "Drobne zmiany" wait for the next one.
           worth=$(python3 scripts/release_notes.py --worth-release "$previous")
-          if [ -z "$previous" ] || ! git diff --quiet "$previous" HEAD -- android; then worth=yes; fi
+          # A new app build means changed app code; docs such as android/README.md do not count.
+          if [ -z "$previous" ] || ! git diff --quiet "$previous" HEAD -- android ':(exclude)android/*.md'; then worth=yes; fi
           # Dropping "Wersja: beta" after test builds publishes the stable release.
           if [[ "$previous" == *-* && "$version" != *-* ]]; then worth=yes; fi
           prerelease=false
