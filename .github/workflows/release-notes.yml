@@ -1,0 +1,31 @@
+name: release-notes
+
+# Writes the notes from CHANGELOG.md into the GitHub releases that have their own section there,
+# so editing CHANGELOG.md on main also updates releases that were published earlier.
+on:
+  push:
+    branches: [main]
+    paths: ["CHANGELOG.md", "scripts/release_notes.py", ".github/workflows/release-notes.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # edit release descriptions
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update release descriptions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for tag in $(grep -oE '^## android-[0-9]+' CHANGELOG.md | cut -c4-); do
+            if gh release view "$tag" > /dev/null 2>&1; then
+              python3 scripts/release_notes.py --tag "$tag" > notes.md
+              gh release edit "$tag" --notes-file notes.md
+              echo "Updated $tag"
+            else
+              echo "No release $tag, skipped"
+            fi
+          done
