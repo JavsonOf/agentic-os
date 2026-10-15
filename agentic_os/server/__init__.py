@@ -23,6 +23,7 @@ GET      /                                 War Room web app (PWA)
 GET      /providers                        configured model providers (keys masked) + presets
 POST     /providers                        add/update ``{id, kind, api_key?, base_url?, default_model?}``
 POST     /providers/{id}/test              send a tiny prompt to check the key works
+GET      /providers/{id}/models            model ids the provider offers to this key
 DELETE   /providers/{id}                   remove a provider
 POST     /settings/default                 ``{provider, model?}`` OS default model
 POST     /agents/external                  ``{name, protocol, url, api_key?, model?, description?}``
@@ -197,6 +198,8 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                                  "default": {"provider": system.prefs.get("default_provider") or "env",
                                              "model": getattr(system.llm, "model", None),
                                              "name": getattr(system.llm, "name", None)}}
+                if m := re.fullmatch(r"/providers/([\w-]+)/models", path):
+                    return 200, {"models": system.providers.models(m.group(1))}
                 if path == "/knowledge":
                     docs: dict[str, dict[str, Any]] = {}
                     for rec in system.knowledge.vectors.all():

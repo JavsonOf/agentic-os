@@ -28,6 +28,23 @@ function toast(msg, isErr = false) {
   t.textContent = msg; t.classList.toggle("err", isErr); t.classList.add("show");
   clearTimeout(state.timers.toast); state.timers.toast = setTimeout(() => t.classList.remove("show"), 3200);
 }
+/* Plain-Polish explanation of common model-provider errors; the raw text stays available under "Szczegóły". */
+function explainError(msg) {
+  const m = String(msg || "");
+  const wait = m.match(/retry in (?:(\d+)h)?(?:(\d+)m)?[\d.]+s/i);
+  const when = wait ? ` Limit odnowi się za ok. ${wait[1] ? wait[1] + " h " : ""}${wait[2] ? wait[2] + " min" : "minutę"}.` : "";
+  if (/HTTP 429|RESOURCE_EXHAUSTED|quota/i.test(m)) return `⏳ Wykorzystałeś limit zapytań do tego modelu (darmowy plan ma dzienny limit).${when} Możesz w 🔑 Modele wybrać inny model z listy albo poczekać.`;
+  if (/HTTP 404|NOT_FOUND|model_not_found|no longer available/i.test(m)) return "🔍 Ten model nie istnieje albo został wycofany. W 🔑 Modele kliknij „📋 Wybierz model” i wybierz model z listy.";
+  if (/HTTP 503|UNAVAILABLE|high demand|overloaded|HTTP 529/i.test(m)) return "🔥 Serwery tego modelu są teraz przeciążone (to po stronie dostawcy). Spróbuj za chwilę albo wybierz inny model.";
+  if (/HTTP 401|HTTP 403|API key|PERMISSION_DENIED|UNAUTHENTICATED/i.test(m)) return "🔑 Klucz API jest nieprawidłowy albo nie ma dostępu do tego modelu. Sprawdź klucz w 🔑 Modele.";
+  if (/Cannot reach|timed out|timeout/i.test(m)) return "📶 Serwer nie może połączyć się z dostawcą modelu. Spróbuj ponownie za chwilę.";
+  return null;
+}
+function errorView(msg) {
+  const hint = explainError(msg);
+  if (!hint) return [richText("⚠️ " + (msg || "Błąd"))];
+  return [el("p", { text: hint }), el("details", {}, el("summary", { text: "Szczegóły" }), el("pre", { text: String(msg) }))];
+}
 /* Safe rich text: escape everything, then allow **bold** and `code` only. */
 function richText(text) {
   const frag = document.createDocumentFragment();
@@ -187,7 +204,7 @@ function addMsg(role, text) {
 }
 function renderAgentReply(node, proc) {
   node.classList.remove("thinking"); node.replaceChildren();
-  if (proc.status === "failed") { node.append(richText("⚠️ " + (proc.error || "Błąd"))); return; }
+  if (proc.status === "failed") { node.append(...errorView(proc.error)); return; }
   const r = proc.result || {};
   node.append(richText(r.output || "(brak odpowiedzi)"));
   if (r.reflection) {
@@ -366,14 +383,14 @@ async function openTask(pid) {
   try {
     const p = await waitForProcess(pid, (cur) => box.replaceChildren(el("p", { class: "muted", text: `Status: ${cur.status}…` })));
     const r = p.result || {};
-    box.replaceChildren(
+    box.replaceChildren(...[
       el("div", { class: "item-head" }, el("h3", { text: p.task.slice(0, 160) }), statusTag(p.status)),
-      el("pre", { class: "out", text: p.error || r.output || JSON.stringify(r, null, 2) }),
+      ...(p.error ? errorView(p.error) : [el("pre", { class: "out", text: r.output || JSON.stringify(r, null, 2) })]),
       r.reflection ? el("details", {}, el("summary", { text: `🔁 Samoocena: ${Math.round(r.reflection.best_score * 100)}% (próby: ${r.reflection.attempts.length})` }), ...r.reflection.attempts.map((a, i) => el("pre", { class: "out", text: `Próba ${i + 1}: ${Math.round(a.score * 100)}%${a.critique ? "\n" + a.critique : ""}` }))) : null,
       r.strategy ? el("p", { class: "muted small", text: `🎯 Styl: ${STRATEGIES[r.strategy] || r.strategy}` }) : null,
       r.transcript ? el("details", {}, el("summary", { text: `Przebieg pracy zespołu (${r.transcript.length})` }), ...r.transcript.map((t) => el("pre", { class: "out", text: `${t.agent}: ${t.output || ""}` }))) : null,
       r.tool_calls && r.tool_calls.length ? el("details", {}, el("summary", { text: "Narzędzia" }), ...r.tool_calls.map((c) => el("pre", { class: "out", text: `${c.tool}(${JSON.stringify(c.arguments)}) → ${c.result}` }))) : null,
-    );
+    ].filter(Boolean)); // replaceChildren() would print a skipped (null) section as the text "null"
     box.scrollIntoView({ behavior: "smooth", block: "nearest" });
   } catch (err) { box.replaceChildren(el("p", { class: "error", text: err.message })); }
 }
@@ -479,8 +496,9 @@ async function loadModels() {
     el("div", { class: "actions" },
       el("button", { class: "btn small", type: "button", text: "Testuj", onclick: async (ev) => {
         ev.target.disabled = true;
-        try { const r = await api(`/providers/${p.id}/test`, { method: "POST", body: {} }); toast(`✅ Działa (${r.model}): ${r.reply}`); } catch (err) { toast("❌ " + err.message, true); } finally { ev.target.disabled = false; }
+        try { const r = await api(`/providers/${p.id}/test`, { method: "POST", body: {} }); toast(`✅ Działa (${r.model}): ${r.reply}`); } catch (err) { toast("❌ " + (explainError(err.message) || err.message), true); } finally { ev.target.disabled = false; }
       } }),
+      el("button", { class: "btn small", type: "button", text: "📋 Wybierz model", onclick: (ev) => pickModel(p, data.default, ev.target) }),
       el("button", { class: "btn small", type: "button", text: "Ustaw domyślny", onclick: async () => {
         try { await api("/settings/default", { method: "POST", body: { provider: p.id, model: p.default_model || undefined } }); toast("Ustawiono ✅"); loadModels(); } catch (err) { toast(err.message, true); }
       } }),
@@ -494,6 +512,24 @@ async function loadModels() {
     sel.replaceChildren(...data.presets.map((p, i) => el("option", { value: String(i), text: p.label })));
     fillProviderForm(data.presets[0], true);
   }
+}
+/* Lists the models this key can really use, so nobody has to guess (and mistype) a model name. */
+async function pickModel(p, current, button) {
+  const item = button.closest(".item");
+  item.querySelector(".model-pick")?.remove();
+  button.disabled = true;
+  let models;
+  try { ({ models } = await api(`/providers/${p.id}/models`)); } catch (err) { toast("❌ " + (explainError(err.message) || err.message), true); return; } finally { button.disabled = false; }
+  if (!models.length) { toast("Dostawca nie zwrócił listy modeli – wpisz nazwę ręcznie w „Edytuj”.", true); return; }
+  const sel = el("select", { "aria-label": "Model" }, ...models.map((m) => el("option", { value: m, text: m, selected: m === p.default_model })));
+  const save = el("button", { class: "btn small primary", type: "button", text: "Zapisz", onclick: async () => {
+    try {
+      await api("/providers", { method: "POST", body: { id: p.id, kind: p.kind, base_url: p.base_url, label: p.label, default_model: sel.value,
+        make_default: current.provider === p.id } });
+      toast(`Model: ${sel.value} ✅`); loadModels();
+    } catch (err) { toast(err.message, true); }
+  } });
+  item.append(el("div", { class: "model-pick actions" }, el("span", { class: "muted small", text: `Dostępne modele (${models.length}):` }), sel, save));
 }
 function fillProviderForm(p, isPreset = false) {
   const f = $("#provider-form");

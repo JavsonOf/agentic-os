@@ -8,6 +8,7 @@ other server that speaks ``POST {base_url}/chat/completions``.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.request
@@ -28,13 +29,20 @@ RETRY_DELAYS = (2.0, 5.0, 10.0)
 MAX_RETRY_AFTER = 30.0
 
 
-def _retry_delay(exc: urllib.error.HTTPError, default: float) -> float:
-    """Honour a numeric ``Retry-After`` header when present, capped so a chat never hangs for long."""
+def _retry_delay(exc: urllib.error.HTTPError, detail: str, default: float) -> float:
+    """Seconds the provider asks us to wait: ``Retry-After`` or Google's ``retryDelay``, else ``default``."""
     header = exc.headers.get("Retry-After") if exc.headers else None
     try:
-        return min(float(header), MAX_RETRY_AFTER) if header else default
+        if header:
+            return float(header)
     except ValueError:
-        return default
+        pass
+    if found := re.search(r'"retryDelay":\s*"(\d+(?:\.\d+)?)s"', detail):
+        return float(found.group(1))
+    if found := re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?(\d+(?:\.\d+)?)s", detail):
+        hours, minutes, seconds = found.groups()
+        return int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(seconds)
+    return default
 
 
 def post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeout: float) -> dict[str, Any]:
@@ -50,13 +58,33 @@ def post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeou
                 body = resp.read().decode("utf-8", "replace")
             break
         except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:2000]
             if exc.code in RETRY_STATUSES and attempt < len(RETRY_DELAYS):
-                time.sleep(_retry_delay(exc, RETRY_DELAYS[attempt]))
-                continue
-            detail = exc.read().decode("utf-8", "replace")[:500]
-            raise LLMError(f"HTTP {exc.code} from {url}: {detail}") from exc
+                delay = _retry_delay(exc, detail, RETRY_DELAYS[attempt])
+                # A long wait (e.g. a daily free-tier quota) will not clear in time: fail now, keep the quota.
+                if delay <= MAX_RETRY_AFTER:
+                    time.sleep(delay)
+                    continue
+            raise LLMError(f"HTTP {exc.code} from {url}: {detail[:500]}") from exc
         except urllib.error.URLError as exc:
             raise LLMError(f"Cannot reach {url}: {exc.reason}") from exc
+    return _decode(body, url)
+
+
+def get_json(url: str, headers: dict[str, str], timeout: float = 30.0) -> dict[str, Any]:
+    """GET a JSON document (e.g. a provider's model list), turning HTTP errors into :class:`LLMError`."""
+    request = urllib.request.Request(url, method="GET", headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        raise LLMError(f"HTTP {exc.code} from {url}: {exc.read().decode('utf-8', 'replace')[:500]}") from exc
+    except urllib.error.URLError as exc:
+        raise LLMError(f"Cannot reach {url}: {exc.reason}") from exc
+    return _decode(body, url)
+
+
+def _decode(body: str, url: str) -> dict[str, Any]:
     try:
         return json.loads(body) if body.strip() else {}
     except json.JSONDecodeError as exc:
