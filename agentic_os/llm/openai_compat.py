@@ -8,6 +8,7 @@ other server that speaks ``POST {base_url}/chat/completions``.
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING, Any
@@ -21,18 +22,41 @@ _FINISH = {"stop": "end_turn", "tool_calls": "tool_use", "function_call": "tool_
            "content_filter": "refusal"}
 
 
-def post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeout: float) -> dict[str, Any]:
-    """POST JSON and decode the JSON reply, turning HTTP errors into :class:`LLMError`."""
-    data = json.dumps(payload).encode()
-    request = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/json", **headers})
+# Overloaded or rate-limited providers (e.g. Gemini's "high demand" 503) usually recover within seconds.
+RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+RETRY_DELAYS = (2.0, 5.0, 10.0)
+MAX_RETRY_AFTER = 30.0
+
+
+def _retry_delay(exc: urllib.error.HTTPError, default: float) -> float:
+    """Honour a numeric ``Retry-After`` header when present, capped so a chat never hangs for long."""
+    header = exc.headers.get("Retry-After") if exc.headers else None
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:
-            body = resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:500]
-        raise LLMError(f"HTTP {exc.code} from {url}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise LLMError(f"Cannot reach {url}: {exc.reason}") from exc
+        return min(float(header), MAX_RETRY_AFTER) if header else default
+    except ValueError:
+        return default
+
+
+def post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeout: float) -> dict[str, Any]:
+    """POST JSON and decode the JSON reply, turning HTTP errors into :class:`LLMError`.
+
+    Temporary failures (429 and 5xx) are retried with backoff before giving up.
+    """
+    data = json.dumps(payload).encode()
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        request = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/json", **headers})
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as resp:
+                body = resp.read().decode("utf-8", "replace")
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in RETRY_STATUSES and attempt < len(RETRY_DELAYS):
+                time.sleep(_retry_delay(exc, RETRY_DELAYS[attempt]))
+                continue
+            detail = exc.read().decode("utf-8", "replace")[:500]
+            raise LLMError(f"HTTP {exc.code} from {url}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise LLMError(f"Cannot reach {url}: {exc.reason}") from exc
     try:
         return json.loads(body) if body.strip() else {}
     except json.JSONDecodeError as exc:
