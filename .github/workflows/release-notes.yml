@@ -43,7 +43,7 @@ jobs:
       - name: Name APK files after their version
         run: |
           # Only the file name changes (AgenticOS.apk -> AgenticOS_vX.Y.Z.apk); the file itself stays the same.
-          for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
+          for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
             if ! gh release view "$tag" > /dev/null 2>&1; then continue; fi
             name=$(python3 scripts/release_notes.py --apk-name "$tag")
             for id in $(gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq '.assets[] | select(.name == "AgenticOS.apk") | .id'); do
@@ -53,7 +53,7 @@ jobs:
           done
       - name: Update release titles and notes
         run: |
-          for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
+          for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
             if ! gh release view "$tag" > /dev/null 2>&1; then echo "No release $tag, skipped"; continue; fi
             python3 scripts/release_notes.py --tag "$tag" > notes.md
             gh release edit "$tag" --title "$tag – $(python3 scripts/release_notes.py --title "$tag")" --notes-file notes.md

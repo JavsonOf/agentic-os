@@ -123,3 +123,20 @@ def test_test_builds_get_alpha_beta_rc_suffixes_and_the_stable_release_keeps_the
     first_stable = NEW.replace("Tytuł: New", "Wersja: major rc\nTytuł: New")
     assert release_notes.next_version(first_stable, OLD, []) == "v1.0.0-rc.1"
     assert release_notes.next_version(NEW, OLD, ["v1.0.0-rc.1"]) == "v1.0.0"
+
+
+def test_a_rebuild_of_the_same_version_gets_build_metadata():
+    rebuild = NEW.replace("Tytuł: New", "Wersja: build\nTytuł: New")
+    assert release_notes.next_version(rebuild, OLD, []) == "v0.1.1+build.1"
+    assert release_notes.next_version(rebuild, OLD, ["v0.1.1+build.1"]) == "v0.1.1+build.2"
+    assert release_notes.next_version(NEW, OLD, ["v0.1.1+build.2"]) == "v0.2.0"  # metadata does not change the number
+    assert release_notes.apk_name("v0.1.1+build.2") == "AgenticOS_v0.1.1_build.2.apk"
+    assert release_notes.parse_version("v0.1.1+build.2") == (0, 1, 1)
+
+
+def test_a_release_section_can_carry_its_own_note():
+    text = NEW.replace("_2.10.2026 · dawniej android-2_", "_2.10.2026 · dawniej android-2_\n\n> Uwaga: Ta sama aplikacja.")
+    note = release_notes.release_note(text, "v0.1.1")
+    assert note.startswith("> **Uwaga:** Ta sama aplikacja.") and "1.0.2" in note
+    assert release_notes.notes_for_tag(text, "v0.1.1").startswith("### Ulepszono")
+    assert release_notes.release_note(NEW, "v0.1.0").count("Uwaga") == 1
