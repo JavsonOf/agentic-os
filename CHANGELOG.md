@@ -41,6 +41,11 @@ Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi s
 
 ## Następne wydanie
 
+Tytuł: OpenCode 2 Bridge for Android
+
+### Dodano
+- Mostek do OpenCode 2: agenci Agentic OS mogą zlecać zadania programistyczne OpenCode działającemu na telefonie (Termux) albo komputerze. Instrukcja krok po kroku jest w docs/OPENCODE.md.
+
 ### Drobne zmiany
 - Zmiana samej instrukcji aplikacji na Androida nie tworzy już nowego wydania.
 - Ponowne zbudowanie tej samej wersji dostaje dopisek po plusie, np. v0.2.6+build.1, a wydanie może mieć w opisie własną uwagę.
