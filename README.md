@@ -91,7 +91,7 @@ Android as an app (PWA). It needs `AGENTIC_OS_API_KEY` as its password.
 | Tab | What you can do |
 |---|---|
 | 💬 Czat | Multi-turn chat with any agent; see the tools it used and its sources; 👍/👎 feedback |
-| 🤖 Agenci | Create agents (instructions, model, tools, skills, thinking mode, delegation, tool approval), connect external agents (OpenAI-compatible such as Hermes/Grok/OpenClaw, A2A, webhook), run crews |
+| 🤖 Agenci | Create agents (instructions, model, tools, skills, thinking mode, delegation, tool approval), connect external agents (OpenAI-compatible such as Hermes/Grok/OpenClaw, A2A, webhook; OpenCode 2 via [the bridge](docs/OPENCODE.md)), run crews |
 | 📋 Zadania | Every run as a process with status and result |
 | 🧠 Mózg | Knowledge graph of documents, facts, episodes and lessons; **import memory** from ChatGPT, Claude, Gemini (Takeout), Grok, DeepSeek, Mistral exports, or a pasted memory list |
 | 📚 Wiedza | Add documents to the knowledge base (RAG) |

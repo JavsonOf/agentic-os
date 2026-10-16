@@ -38,8 +38,9 @@ AGENT_PRESETS: list[dict[str, str]] = [
      "note": "Klucz z console.x.ai i nazwa modelu Grok."},
     {"name": "openclaw", "label": "OpenClaw", "protocol": "openai", "url": "",
      "note": "Adres Twojej bramki OpenClaw z włączonym endpointem zgodnym z OpenAI."},
-    {"name": "opencode", "label": "OpenCode", "protocol": "webhook", "url": "",
-     "note": "OpenCode działa na Twoim komputerze: wystaw go pod publicznym adresem (A2A lub webhook)."},
+    {"name": "opencode", "label": "OpenCode", "protocol": "webhook", "url": "http://127.0.0.1:8765",
+     "note": "OpenCode 2 przez mostek scripts/opencode_bridge.py (instrukcja dla telefonu: docs/OPENCODE.md). "
+             "Klucz to token mostka."},
     {"name": "a2a-agent", "label": "Dowolny agent A2A", "protocol": "a2a", "url": "",
      "note": "Każdy agent zgodny z Agent2Agent (np. zbudowany w Google ADK)."},
     {"name": "webhook-agent", "label": "Dowolny agent (webhook)", "protocol": "webhook", "url": "",
