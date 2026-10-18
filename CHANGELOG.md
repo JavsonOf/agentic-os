@@ -41,6 +41,11 @@ Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi s
 
 ## Następne wydanie
 
+Tytuł: Clear OpenRouter Privacy Errors
+
+### Ulepszono
+- Gdy OpenRouter nie ma dla wybranego modelu dostawcy zgodnego z Twoimi ustawieniami prywatności albo model nie obsługuje narzędzi, War Room wyjaśnia to po polsku i podaje, co zmienić.
+
 ### Drobne zmiany
 - Zmiana samej instrukcji aplikacji na Androida nie tworzy już nowego wydania.
 - Ponowne zbudowanie tej samej wersji dostaje dopisek po plusie, np. v0.2.6+build.1, a wydanie może mieć w opisie własną uwagę.

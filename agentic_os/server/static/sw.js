@@ -1,5 +1,5 @@
 /* Agentic OS service worker: caches the app shell so it opens like an app; API calls always go to the network. */
-const CACHE = "aos-shell-v12";
+const CACHE = "aos-shell-v13";
 const SHELL = ["/", "/app.js", "/errors.js", "/qr.js", "/app.css", "/icon.svg", "/icon-192.png", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

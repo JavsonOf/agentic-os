@@ -63,6 +63,12 @@ const ERROR_RULES = [
   [/google-genai.*required|'anthropic' package is required/, "📦 Na serwerze brakuje biblioteki dla tego modelu. W terminalu serwera uruchom: pip install -e \".[gemini]\" (albo \".[anthropic]\") i uruchom serwer ponownie."],
   [/A model id is required/, "🤖 Nie podano nazwy modelu. W Modele, w sekcji „Wybierz model”, zaznacz model z listy."],
   [/No provider named|No provider '|Unknown provider/, "🔑 Ten dostawca modeli nie jest skonfigurowany (mógł zostać usunięty). Dodaj go ponownie w Modele albo wybierz innego."],
+  [/endpoints? .{0,60}available matching your (?:guardrail|data policy)|No endpoints found matching your data policy|zdr-violation/i, (m, t) => {
+    const link = (t.match(/(?:configurable at|Configure:|configure_url"?:\s*"?)\s*(https:\/\/openrouter\.ai\/[^\s"\\,)]+)/i) || [])[1];
+    return "🛡️ OpenRouter nie ma dla tego modelu żadnego dostawcy, który spełnia Twoje ustawienia prywatności (np. ZDR – brak zapisywania danych). "
+      + `Wybierz w Modele inny model albo zmień te ustawienia: ${(link || "https://openrouter.ai/settings/privacy").replace(/[.]$/, "")}`;
+  }],
+  [/No endpoints found that support tool use/i, "🧰 Ten model w OpenRouter nie obsługuje narzędzi, z których korzysta agent. Wybierz w Modele inny model, który obsługuje narzędzia (tools)."],
   [/context.{0,20}(length|window)|too many tokens|maximum context|prompt is too long|input.{0,20}too long|exceeds the maximum/i,
     "📏 Rozmowa jest za długa dla tego modelu. Kliknij „Nowa rozmowa” albo wybierz model z większym kontekstem."],
   [/credit balance is too low|insufficient[_ ](quota|funds|balance)|\b402\b|billing/i,
