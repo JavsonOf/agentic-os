@@ -206,3 +206,11 @@ def test_post_json_does_not_retry_a_long_quota_wait(monkeypatch):
     with pytest.raises(LLMError, match="HTTP 429"):
         openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
     assert sleeps == [3.0, 3.0, 3.0]
+
+
+def test_offline_model_says_in_polish_that_it_is_not_an_ai():
+    from agentic_os.llm.mock import OFFLINE_NOTICE
+
+    assert HeuristicLLM().complete([Message.user("Cześć")]).text == OFFLINE_NOTICE
+    after_tool = HeuristicLLM().complete([Message.user("x"), Message.tool("call_1", "No relevant documents found.")])
+    assert after_tool.text.startswith("⚠️ To nie jest odpowiedź AI") and "No relevant documents found." in after_tool.text
