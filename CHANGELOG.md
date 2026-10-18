@@ -41,9 +41,10 @@ Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi s
 
 ## Następne wydanie
 
-Tytuł: Clear OpenRouter Privacy Errors
+Tytuł: Clear Notice When No AI Model Is Set
 
 ### Ulepszono
+- Gdy agent nie ma ustawionego modelu AI, jego odpowiedź zaczyna się od jasnej uwagi po polsku, że to tryb testowy bez AI, i mówi, gdzie ustawić model. Wcześniej pokazywał niezrozumiały tekst po angielsku.
 - Gdy OpenRouter nie ma dla wybranego modelu dostawcy zgodnego z Twoimi ustawieniami prywatności albo model nie obsługuje narzędzi, War Room wyjaśnia to po polsku i podaje, co zmienić.
 
 ### Drobne zmiany

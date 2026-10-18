@@ -40,6 +40,10 @@ class ScriptedLLM(LLMProvider):
         return item
 
 
+OFFLINE_NOTICE = ("⚠️ To nie jest odpowiedź AI. Ten agent nie ma ustawionego modelu, więc działa w trybie testowym "
+                  "offline, który nie rozumie pytań. Dodaj klucz w zakładce Modele i ustaw go jako domyślny albo wybierz "
+                  "model w ustawieniach agenta.")
+
 _MATH = re.compile(r"[-+*/().\d\s^%]*\d[-+*/().\d\s^%]*[-+*/^%][-+*/().\d\s^%]*\d[-+*/().\d\s^%]*")
 _ids = itertools.count(1)
 
@@ -49,7 +53,8 @@ class HeuristicLLM(LLMProvider):
 
     It picks a tool by simple heuristics (math -> calculator, otherwise
     knowledge search), summarizes tool results, and emits JSON plans when
-    asked by the planner. It is not intelligent; it shows the plumbing.
+    asked by the planner. It is not intelligent; it shows the plumbing, and
+    every answer starts with a Polish notice saying so (War Room users read it).
     """
 
     name = "heuristic"
@@ -68,7 +73,7 @@ class HeuristicLLM(LLMProvider):
                     break
                 results.append(msg.content)
             body = "\n".join(reversed(results))
-            return LLMResponse(text=f"Based on the tool results:\n{body}")
+            return LLMResponse(text=f"{OFFLINE_NOTICE}\n\nWyniki narzędzi:\n{body}")
 
         text = last.content
         task = re.search(r"<task>\s*(.*?)\s*</task>", text, re.DOTALL)
@@ -77,12 +82,12 @@ class HeuristicLLM(LLMProvider):
             text = task.group(1)
         match = _MATH.search(text)
         if knowledge and not match:
-            return LLMResponse(text=f"From the knowledge base:\n{knowledge.group(1)}")
+            return LLMResponse(text=f"{OFFLINE_NOTICE}\n\nZ bazy wiedzy:\n{knowledge.group(1)}")
         if "calculator" in tool_names and match:
             return self._call("calculator", {"expression": match.group(0).strip()})
         if "search_knowledge" in tool_names:
             return self._call("search_knowledge", {"query": text})
-        return LLMResponse(text=f"[offline heuristic model] {text.strip()}")
+        return LLMResponse(text=OFFLINE_NOTICE)
 
     @staticmethod
     def _call(name: str, args: dict) -> LLMResponse:
