@@ -60,7 +60,25 @@ jobs:
           echo "APK_NAME=$(python3 scripts/release_notes.py --apk-name "$version")" >> "$GITHUB_ENV"
           echo "Previous: ${previous:-none} (stable: ${stable:-none}) · next: $version – $title · publish: $worth"
           cat release-notes.md
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PUBLISH: ${{ steps.notes.outputs.publish }}
+        run: |
+          # The private key lives only in repository secrets (android/keys/README.md). Pull requests and
+          # runs without it build with the debug key; a release must never ship with that key.
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          elif [ "$PUBLISH" = "yes" ]; then
+            echo "::error::Brak sekretu ANDROID_KEYSTORE_BASE64, więc nie da się podpisać wydania. Utwórz klucz: android/keys/README.md"
+            exit 1
+          else
+            echo "No signing key in secrets: building with the debug key (not for release)."
+          fi
       - name: Build APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: gradle -p android --no-daemon assembleRelease testReleaseUnitTest
       - name: Rename APK
         run: |

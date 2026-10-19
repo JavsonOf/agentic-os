@@ -44,6 +44,13 @@ Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi s
 
 ## Następne wydanie
 
+Tytuł: New Private Signing Key for the Android App
+
+### Zmieniono
+- Aplikacja na Androida jest podpisywana nowym, prywatnym kluczem, którego nie ma w repozytorium. Dzięki temu nikt poza tym projektem nie może wydać wersji, którą telefon uzna za aktualizację.
+  - Przed instalacją tej wersji trzeba raz odinstalować poprzednią, bo Android nie pozwala zmienić klucza przy aktualizacji.
+  - Po instalacji podaj ponownie adres serwera i hasło do War Room. Dla pewności warto przy okazji zmienić to hasło.
+
 ### Drobne zmiany
 - Opisy wydań są rozszerzone: gdy zmiana obejmuje kilka elementów (np. agentów i ich skille), każdy jest wypisany jako podpunkt.
 
