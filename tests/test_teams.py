@@ -1,11 +1,26 @@
+import json
 import threading
+import urllib.error
+import urllib.request
 
 import pytest
 
 from agentic_os import AgenticOS, teams
 from agentic_os.config import Settings
 from agentic_os.server import make_server
-from tests.test_kernel_server_apps import _request
+
+
+def _request(base, method, path, body=None, token=None):
+    req = urllib.request.Request(base + path, method=method, data=json.dumps(body).encode() if body is not None else None)
+    req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as err:
+        return err.code, json.loads(err.read())
+
 
 TOOLS = {"calculator", "csv_summary", "text_stats", "search_knowledge", "recall_memories", "remember_fact"}
 
