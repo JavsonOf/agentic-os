@@ -58,6 +58,7 @@ CASES = [
     ('A stdio MCP server needs a command', 'polecenie'),
     ("transport must be 'http' or 'stdio'", 'http albo stdio'),
     ("No agent named 'writer'. Running: ['assistant']", '„writer”'),
+    ("No team 'ghost'", 'zespołu'),
     ("The default 'assistant' agent cannot be removed", 'nie można usunąć'),
     ("No process 'ab12cd34'", 'nie istnieje'),
     ("No pending approval 'x1' (it may have timed out)", 'wygasła'),
