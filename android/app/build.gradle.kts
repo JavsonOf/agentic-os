@@ -14,23 +14,25 @@ android {
         versionName = System.getenv("APP_VERSION") ?: "0.0.0-dev"  // release version from CHANGELOG.md
     }
 
+    // Releases are signed with a private key that never enters git: CI decodes it from repository secrets
+    // and passes its path and passwords here (see keys/README.md). Without it (pull requests, local
+    // builds) the APK gets the throwaway debug key and cannot update an installed release.
+    val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
     signingConfigs {
-        // A fixed key so every build can be installed over the previous one (sideloaded app, not Play Store).
-        create("sideload") {
-            storeFile = rootProject.file("keys/agentic-os.keystore")
-            storePassword = "agentic-os"
-            keyAlias = "agentic-os"
-            keyPassword = "agentic-os"
+        if (keystorePath != null) {
+            create("private") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "agentic-os"
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("sideload")
-        }
-        debug {
-            signingConfig = signingConfigs.getByName("sideload")
+            signingConfig = signingConfigs.findByName("private") ?: signingConfigs.getByName("debug")
         }
     }
 

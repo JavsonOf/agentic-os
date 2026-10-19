@@ -35,4 +35,4 @@ gradle -p android assembleRelease             # Gradle 8.14, JDK 17+
 ```
 
 Kod to jedna klasa: `app/src/main/java/os/agentic/warroom/MainActivity.java` (WebView, bez dodatkowych
-bibliotek). Klucz podpisu opisuje `keys/README.md`.
+bibliotek). Wydania są podpisane prywatnym kluczem z sekretów GitHuba, a nie kluczem z repozytorium: opisuje to `keys/README.md`.
