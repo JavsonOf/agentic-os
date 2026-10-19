@@ -65,6 +65,9 @@ def parse(text: str) -> list[tuple[str | None, str, str]]:
             category = line[4:].strip()
         elif in_section and line.startswith("- ") and category:
             points.append((tag, category, line[2:].strip()))
+        elif in_section and category and points and points[-1][0] == tag and re.match(r"^\s+- ", line):
+            last = points[-1]  # an indented "  - " line is a sub-point of the point above
+            points[-1] = (last[0], last[1], f"{last[2]}\n  - {line.strip()[2:].strip()}")
     return points
 
 

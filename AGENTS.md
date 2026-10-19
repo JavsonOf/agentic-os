@@ -91,6 +91,8 @@ paste keys into chat, do not put keys in environment files you commit, and never
   stay in Polish. Write the title in the `Tytuł:` line of **Następne wydanie** in `CHANGELOG.md`.
 - The version is computed automatically. Add `Wersja: major` or `Wersja: minor` only when that automatic
   bump is too small. For a test build add `alpha`, `beta` or `rc` to the same line (see below).
+- Release notes are detailed: when a change has several parts (agents, skills, screens, features), list each
+  one as an indented sub-point (`  - …`) under its CHANGELOG point with a short description of what it does.
 - Test builds: `Wersja: alpha`, `beta` or `rc` (or e.g. `Wersja: major rc`) publishes a GitHub pre-release
   such as `v0.3.0-beta.1`, `-beta.2` on the next merge, never marked "Latest". Remove the line to publish the
   stable release, which keeps the tested number (`v0.3.0`).

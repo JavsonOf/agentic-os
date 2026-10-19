@@ -29,6 +29,9 @@ w poprzednim. Drobiazgi, dla których nie warto wydawać nowej wersji (literówk
 w kodzie, dokumentacja), wpisuj w kategorii **Drobne zmiany**: zostają zapisane i pojawią się w opisie
 najbliższego prawdziwego wydania. Nowa wersja aplikacji na Androida zawsze dostaje wydanie.
 
+Opisy są rozszerzone: gdy zmiana obejmuje kilka elementów (agentów, skille, ekrany, funkcje), wypisz każdy
+jako podpunkt z wcięciem (`  - …`) i krótkim opisem, co robi. Podpunkty trafiają do opisu wydania.
+
 W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title Case, np. „QR Code Pairing”). Numer wersji automat wylicza sam
 (MINOR, gdy jest coś w Dodano, inaczej PATCH). Linię `Wersja: major` albo `Wersja: minor` dopisz tylko wtedy,
 gdy ten automatyczny skok jest za mały. Dla wersji testowej dopisz w tej samej linii `alpha`, `beta` albo `rc`.
@@ -41,14 +44,34 @@ Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi s
 
 ## Następne wydanie
 
-Tytuł: Ready-Made Team of 5 Agents with 25 Skills
+### Drobne zmiany
+- Opisy wydań są rozszerzone: gdy zmiana obejmuje kilka elementów (np. agentów i ich skille), każdy jest wypisany jako podpunkt.
+
+## v0.3.0 – Ready-Made Team of 5 Agents with 25 Skills
+_19.10.2026_
 
 ### Dodano
-- Gotowy zespół: 5 agentów (Mała firma, Social media, Programista, Projektant, Marketing), każdy z 5 skillami ze swojej działki, np. przepływy pieniężne, posty i rolki, praca nad kodem, prototypy stron, copywriting i SEO w wyszukiwarkach AI. Dodajesz ich jednym przyciskiem w Ty → Agenci.
+- Gotowy zespół: 5 agentów, każdy z 5 skillami ze swojej działki. Dodajesz ich jednym przyciskiem w Ty → Agenci → 📦 Gotowy zespół. Korzystają z modelu domyślnego.
+  - 🏪 **Mała firma** (`mala-firma`): przepływy pieniężne (Cash Flow Snapshot), kampania sprzedażowa (Run Campaign), przygotowanie do podatków (Tax Prep), plan wypłat (Plan Payroll), windykacja zaległych faktur (Invoice Chase).
+  - 📱 **Social media** (`social-media`): posty na LinkedIn i inne (Post Writer), nauka Twojego stylu pisania (Voice Builder), chwytliwe pierwsze zdania (Hook Generator), scenariusze rolek i shortów (Reels Scripting), poprawa profilu (Profile Optimizer).
+  - 💻 **Programista** (`programista`): uporządkowana praca nad kodem: plan, testy, debugowanie, przegląd (Superpowers), pamięć projektu (Memory Keeper), tworzenie nowych skilli (Skill Creator), budowa serwerów MCP (MCP Builder), aktualna dokumentacja bibliotek, także przez Context7 (Docs Fetcher).
+  - 🎨 **Projektant** (`projektant`): pełny system UI/UX (UI UX Pro Max), księga marki (Brand Guidelines), prototypy stron w jednym pliku HTML (Web Artifacts), kod front-endu (Frontend Design), krytyka designu z oceną i poprawkami (Taste).
+  - 📣 **Marketing** (`marketing`): teksty sprzedażowe (Copywriting), materiały za zapis na listę (Lead Magnets), analiza opinii klientów (Customer Research), zwiększanie konwersji (CRO), widoczność w wyszukiwarkach AI i Google (AI SEO).
+- Skille są napisane po polsku specjalnie dla Agentic OS. Agenci nie podają z pamięci stawek ani terminów podatkowych i nie wymyślają liczb ani opinii.
+
+## v0.2.8 – Clear Notice When No AI Model Is Set
+_18.10.2026_
 
 ### Ulepszono
 - Gdy agent nie ma ustawionego modelu AI, jego odpowiedź zaczyna się od jasnej uwagi po polsku, że to tryb testowy bez AI, i mówi, gdzie ustawić model. Wcześniej pokazywał niezrozumiały tekst po angielsku.
-- Gdy OpenRouter nie ma dla wybranego modelu dostawcy zgodnego z Twoimi ustawieniami prywatności albo model nie obsługuje narzędzi, War Room wyjaśnia to po polsku i podaje, co zmienić.
+
+## v0.2.7 – Clear OpenRouter Privacy Errors
+_18.10.2026_
+
+### Ulepszono
+- War Room wyjaśnia po polsku dwa częste błędy OpenRoutera i podaje, co zmienić:
+  - brak dostawcy modelu zgodnego z Twoimi ustawieniami prywatności (np. ZDR), z linkiem do tych ustawień;
+  - model, który nie obsługuje narzędzi używanych przez agenta.
 
 ### Drobne zmiany
 - Zmiana samej instrukcji aplikacji na Androida nie tworzy już nowego wydania.
