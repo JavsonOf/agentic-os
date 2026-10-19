@@ -25,6 +25,7 @@ include = ["agentic_os*"]
 
 [tool.setuptools.package-data]
 "agentic_os.server" = ["static/*"]
+"agentic_os.teams" = ["skills/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

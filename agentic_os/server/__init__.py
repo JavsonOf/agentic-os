@@ -40,6 +40,8 @@ POST     /crew                             ``{task, agents, process?}`` run a cr
 GET      /knowledge                        ingested documents
 GET      /graph                            knowledge/memory graph for the Brain view
 GET/POST /skills, DELETE /skills/{name}    skills (``{name, description, instructions, tools}`` or ``{markdown}``)
+GET      /teams                            ready-made agent teams (5 agents, 25 skills) and whether installed
+POST     /teams/{id}/install               add a team's skills and agent (``all`` installs every team)
 GET/POST /mods, DELETE /mods/{name}        custom HTTP tools
 GET/POST /mcp, DELETE /mcp/{name}          MCP servers; POST /mcp/{name}/reconnect
 POST     /memory/import?filename=&distill= raw export file (zip/json/txt, up to 60 MB) or JSON ``{text}``
@@ -65,6 +67,7 @@ from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from agentic_os import teams
 from agentic_os.agents.external import AGENT_PRESETS, PROTOCOLS, ExternalAgentConfig
 from agentic_os.kernel import AgenticOS, AgenticOSError
 from agentic_os.llm.base import LLMError, Message
@@ -253,6 +256,8 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                     return 200, {"ok": True}
                 if path == "/skills":
                     return 200, {"skills": system.skills.public()}
+                if path == "/teams":
+                    return 200, {"teams": teams.public(system)}
                 if path == "/mods":
                     return 200, {"mods": [m.public() for m in system.mods.all()]}
                 if path == "/mcp":
@@ -329,6 +334,11 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 return 200, system.import_memory(raw, filename, distill=distill)
 
             body = self._body()
+            if m := re.fullmatch(r"/teams/([\w-]+)/install", path):
+                ids = [t.id for t in teams.TEAMS] if m.group(1) == "all" else [m.group(1)]
+                if any(i not in {t.id for t in teams.TEAMS} for i in ids):
+                    raise HTTPError(404, f"No team {m.group(1)!r}")
+                return 200, {"installed": [teams.install_team(system, i) for i in ids]}
             if path == "/skills":
                 if isinstance(body.get("markdown"), str):
                     skill = parse_skill_md(body["markdown"], str(body.get("name") or ""))

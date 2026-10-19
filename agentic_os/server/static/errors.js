@@ -99,6 +99,7 @@ const ERROR_RULES = [
   [/A schedule needs a 'task'/, "🗓️ Wpisz, co agent ma zrobić."],
   [/'time' must look like HH:MM/, "🗓️ Podaj godzinę w formacie GG:MM, np. 07:30."],
   [/'days' must be one of/, "🗓️ Wybierz, kiedy zadanie ma się powtarzać."],
+  [/No team /, "📦 Tego gotowego zespołu nie ma na serwerze. Odśwież stronę albo zaktualizuj serwer (git pull)."],
   [/No schedule /, "🗓️ To zaplanowane zadanie już nie istnieje. Odśwież zakładkę Zadania."],
   [/No document /, "📚 Tego dokumentu już nie ma w wiedzy. Odśwież zakładkę Wiedza."],
   [/'daily_limit' must be a whole number/, "✏️ Dzienny limit zapytań musi być liczbą całkowitą (albo zostaw puste)."],

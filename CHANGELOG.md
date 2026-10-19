@@ -41,7 +41,10 @@ Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi s
 
 ## Następne wydanie
 
-Tytuł: Clear Notice When No AI Model Is Set
+Tytuł: Ready-Made Team of 5 Agents with 25 Skills
+
+### Dodano
+- Gotowy zespół: 5 agentów (Mała firma, Social media, Programista, Projektant, Marketing), każdy z 5 skillami ze swojej działki, np. przepływy pieniężne, posty i rolki, praca nad kodem, prototypy stron, copywriting i SEO w wyszukiwarkach AI. Dodajesz ich jednym przyciskiem w Ty → Agenci.
 
 ### Ulepszono
 - Gdy agent nie ma ustawionego modelu AI, jego odpowiedź zaczyna się od jasnej uwagi po polsku, że to tryb testowy bez AI, i mówi, gdzie ustawić model. Wcześniej pokazywał niezrozumiały tekst po angielsku.

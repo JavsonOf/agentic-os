@@ -699,7 +699,27 @@ async function notify(a) {
 }
 
 /* ----------------------------------------------------------------- agents */
+async function installTeams(id, btn) {
+  btn.disabled = true;
+  try {
+    const { installed } = await api(`/teams/${id}/install`, { method: "POST", body: {} });
+    toast(installed.length > 1 ? `Dodano ${installed.length} agentów ze skillami ✅` : `Agent „${installed[0].agent}” gotowy ✅`);
+    loadAgents();
+  } catch (err) { toast(err.message, true); } finally { btn.disabled = false; }
+}
+async function loadTeams() {
+  let teams = [];
+  try { ({ teams } = await api("/teams")); } catch { return; }  // older server without teams: keep the card empty
+  $("#team-list").replaceChildren(...teams.map((t) => el("div", { class: "item" },
+    el("div", { class: "item-head" }, el("span", { class: "item-title", text: t.label }),
+      el("button", { class: "btn small" + (t.installed ? " ghost" : " primary"), type: "button", text: t.installed ? "Zaktualizuj" : "Dodaj",
+        onclick: (e) => installTeams(t.id, e.currentTarget) })),
+    el("p", { class: "muted small", text: t.description }),
+    el("p", { class: "small", text: "🎓 " + t.skills.join(", ") }))));
+}
+$("#teams-all").addEventListener("click", (e) => installTeams("all", e.currentTarget));
 async function loadAgents() {
+  loadTeams();
   let skills = [];
   try { [, , { skills }] = await Promise.all([refreshAgents(), refreshProviders(), api("/skills")]); } catch (err) { toast(err.message, true); return; }
   $("#agent-skills").replaceChildren(...(skills.length ? skills.map((s) => el("label", { class: "chip" }, el("input", { type: "checkbox", name: "skills", value: s.name }), s.name)) : [el("span", { class: "muted small", text: "Dodaj skille w Ty → Rozszerzenia." })]));
