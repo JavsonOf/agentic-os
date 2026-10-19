@@ -140,3 +140,10 @@ def test_a_release_section_can_carry_its_own_note():
     assert note.startswith("> **Uwaga:** Ta sama aplikacja.") and "1.0.2" in note
     assert release_notes.notes_for_tag(text, "v0.1.1").startswith("### Ulepszono")
     assert release_notes.release_note(NEW, "v0.1.0").count("Uwaga") == 1
+
+
+def test_indented_sub_points_stay_with_their_point():
+    text = NEW.replace("- Nowa rzecz.\n", "- Nowa rzecz.\n  - pierwsza część\n  - druga część\n")
+    notes = release_notes.notes_since(text, OLD)
+    assert "- Nowa rzecz.\n  - pierwsza część\n  - druga część" in notes
+    assert release_notes.worth_release(text, text) is False  # sub-points are part of an existing point
