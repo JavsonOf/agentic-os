@@ -231,7 +231,7 @@ def test_war_room_static_app_is_public_but_api_is_protected(war_room):
     base, _ = war_room
     status, html = _req(base, "GET", "/", token=None)
     assert status == 200 and "Agentic OS" in html and "app.js" in html
-    for path in ("/app.js", "/app.css", "/manifest.webmanifest", "/sw.js", "/icon.svg", "/icon-192.png"):
+    for path in ("/app.js", "/app.css", "/manifest.webmanifest", "/sw.js", "/wake.html", "/icon.svg", "/icon-192.png"):
         req = urllib.request.Request(base + path)
         with urllib.request.urlopen(req, timeout=10) as resp:
             assert resp.status == 200 and resp.read()
@@ -347,3 +347,12 @@ def test_war_room_bottom_bar_has_the_five_version_c_tabs():
         assert f'id="tab-{section}"' in html
         if section != "me":
             assert f'data-go="{section}"' in html
+
+
+def test_sleeping_server_gets_the_wake_screen_instead_of_a_bare_404():
+    static = Path(__file__).resolve().parent.parent / "agentic_os" / "server" / "static"
+    sw = (static / "sw.js").read_text(encoding="utf-8")
+    assert '"/wake.html"' in sw and "404" in sw and 'mode === "navigate"' in sw
+    wake = (static / "wake.html").read_text(encoding="utf-8")
+    assert "Serwer śpi" in wake and 'fetch("/health"' in wake and 'location.replace("/")' in wake
+    assert "<link rel=\"stylesheet\"" not in wake and "<script src" not in wake  # works from cache, offline
