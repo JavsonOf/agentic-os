@@ -86,6 +86,11 @@ CASES = [
     ("Invalid parameter 'x' (type must be one of ['boolean', 'integer', 'number', 'string'])", 'typ'),
     ('Uszkodzony plik ZIP', 'ZIP'),
     ("KeyError: 'foo'", 'nieoczekiwany'),
+    ('Forbidden host: without AGENTIC_OS_API_KEY only localhost is accepted', 'localhost'),
+    ('Cross-site request refused', 'innej strony'),
+    ('Re-enter the API key when changing the provider address', 'klucz API jeszcze raz'),
+    ("Re-enter the mod's headers when changing its address", 'nagłówki'),
+    ('HTTP Error 302: Refused a redirect to another host (evil.example) so the API key is not sent there', 'evil.example'),
 ]
 
 

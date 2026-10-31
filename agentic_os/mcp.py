@@ -27,6 +27,7 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from agentic_os import net
 from agentic_os.providers import mask
 from agentic_os.tools.registry import Tool
 
@@ -99,7 +100,7 @@ class _HttpTransport:
             headers["MCP-Protocol-Version"] = PROTOCOL_VERSION
         req = urllib.request.Request(self.cfg.url, data=json.dumps(message).encode(), method="POST", headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with net.urlopen(req, timeout=self.timeout) as resp:
                 sid = resp.headers.get("Mcp-Session-Id")
                 if sid:
                     self.session_id = sid

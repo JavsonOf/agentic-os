@@ -14,6 +14,7 @@ import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING, Any
 
+from agentic_os import net
 from agentic_os.llm.base import LLMError, LLMProvider, LLMResponse, Message, ToolCall
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -54,7 +55,7 @@ def post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeou
     for attempt in range(len(RETRY_DELAYS) + 1):
         request = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type": "application/json", **headers})
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as resp:
+            with net.urlopen(request, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8", "replace")
             break
         except urllib.error.HTTPError as exc:
@@ -75,7 +76,7 @@ def get_json(url: str, headers: dict[str, str], timeout: float = 30.0) -> dict[s
     """GET a JSON document (e.g. a provider's model list), turning HTTP errors into :class:`LLMError`."""
     request = urllib.request.Request(url, method="GET", headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:
+        with net.urlopen(request, timeout=timeout) as resp:
             body = resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
         raise LLMError(f"HTTP {exc.code} from {url}: {exc.read().decode('utf-8', 'replace')[:500]}") from exc

@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from agentic_os import net
 from agentic_os.config import Settings
 from agentic_os.llm import HeuristicLLM, Message, ScriptedLLM, ToolCall, create_llm, estimate_tokens, truncate_to_tokens
 from agentic_os.llm.anthropic_provider import FALLBACK_BETA, AnthropicProvider, to_anthropic_messages
@@ -133,7 +134,6 @@ def _http_error(code, headers=None, body=b'{"error": "busy"}'):
 
 
 def test_post_json_retries_temporary_overload(monkeypatch):
-    import urllib.request
 
     from agentic_os.llm import openai_compat
 
@@ -146,14 +146,13 @@ def test_post_json_retries_temporary_overload(monkeypatch):
             raise result
         return result
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(net, "urlopen", fake_urlopen)
     monkeypatch.setattr(openai_compat.time, "sleep", sleeps.append)
     assert openai_compat.post_json("https://x/chat/completions", {}, {}, 5) == {"ok": True}
     assert sleeps == [openai_compat.RETRY_DELAYS[0], 1.0]
 
 
 def test_post_json_gives_up_after_retries_and_skips_client_errors(monkeypatch):
-    import urllib.request
 
     import pytest
 
@@ -168,20 +167,19 @@ def test_post_json_gives_up_after_retries_and_skips_client_errors(monkeypatch):
         return fake_urlopen
 
     monkeypatch.setattr(openai_compat.time, "sleep", lambda _s: None)
-    monkeypatch.setattr(urllib.request, "urlopen", always(503))
+    monkeypatch.setattr(net, "urlopen", always(503))
     with pytest.raises(LLMError, match="HTTP 503"):
         openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
     assert len(calls) == len(openai_compat.RETRY_DELAYS) + 1
 
     calls.clear()
-    monkeypatch.setattr(urllib.request, "urlopen", always(401))
+    monkeypatch.setattr(net, "urlopen", always(401))
     with pytest.raises(LLMError, match="HTTP 401"):
         openai_compat.post_json("https://x/chat/completions", {}, {}, 5)
     assert calls == [401]
 
 
 def test_post_json_does_not_retry_a_long_quota_wait(monkeypatch):
-    import urllib.request
 
     import pytest
 
@@ -195,7 +193,7 @@ def test_post_json_does_not_retry_a_long_quota_wait(monkeypatch):
         calls.append(1)
         raise _http_error(429, body=daily if len(calls) == 1 else per_minute)
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(net, "urlopen", fake_urlopen)
     monkeypatch.setattr(openai_compat.time, "sleep", sleeps.append)
     with pytest.raises(LLMError, match="RESOURCE_EXHAUSTED"):
         openai_compat.post_json("https://x/chat/completions", {}, {}, 5)

@@ -18,6 +18,7 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from agentic_os import net
 from agentic_os.providers import mask
 from agentic_os.tools.registry import Tool
 
@@ -90,7 +91,7 @@ class Mod:
                 headers["Content-Type"] = "application/json"
             req = urllib.request.Request(url, data=data, method=method, headers=headers)
             try:
-                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                with net.urlopen(req, timeout=timeout) as resp:
                     text = resp.read(MAX_RESPONSE + 1).decode("utf-8", "replace")
             except urllib.error.HTTPError as exc:
                 return f"HTTP {exc.code}: {exc.read(2000).decode('utf-8', 'replace')}"
@@ -135,7 +136,11 @@ class ModRegistry:
         with self._lock:
             existing = self._mods.get(mod.name)
             if keep_existing_headers and existing:
-                for key, value in existing.headers.items():
+                moved = not net.same_site(existing.url, mod.url)
+                if moved and any(not v or v.startswith("•") for v in mod.headers.values()):
+                    # Stored headers (API keys) belong to the old address: never send them somewhere new.
+                    raise ValueError("Re-enter the mod's headers when changing its address")
+                for key, value in ({} if moved else existing.headers).items():
                     # Editing keeps stored secrets unless replaced: absent, empty or masked values mean "unchanged".
                     if not mod.headers.get(key) or mod.headers[key].startswith("•"):
                         mod.headers[key] = value

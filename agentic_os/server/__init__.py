@@ -96,6 +96,7 @@ STATIC_FILES = {
     "/icon-192.png": ("icon-192.png", "image/png"),
     "/icon-512.png": ("icon-512.png", "image/png"),
 }
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _NAME = re.compile(r"[a-zA-Z0-9_-]{1,40}")
 
 
@@ -162,6 +163,24 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 raise HTTPError(400, "JSON body must be an object")
             return body
 
+        def _guard_local(self, method: str) -> None:
+            """Without a password the server only trusts its own machine.
+
+            A web page can still reach 127.0.0.1 from the owner's browser: directly (CSRF, e.g. a form that
+            adds an MCP server which runs a program) or through a domain that resolves to 127.0.0.1 (DNS
+            rebinding). Requests must name a local host, and browser writes must come from a local page.
+            """
+            if api_key:
+                return  # every request needs the bearer token, which another site cannot read or send
+            host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
+            if host and host not in LOCAL_HOSTS:
+                raise HTTPError(403, "Forbidden host: without AGENTIC_OS_API_KEY only localhost is accepted")
+            if method != "GET":
+                origin = self.headers.get("Origin")
+                origin_host = (urllib.parse.urlsplit(origin).hostname or "") if origin and origin != "null" else ""
+                if (origin and origin_host.lower() not in LOCAL_HOSTS) or self.headers.get("Sec-Fetch-Site") == "cross-site":
+                    raise HTTPError(403, "Cross-site request refused")
+
         def _authorize(self) -> None:
             path = self.path.split("?", 1)[0]
             if not api_key or path == "/health" or path in STATIC_FILES:
@@ -192,6 +211,7 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 path = self.path.split("?", 1)[0]
                 if method == "GET" and self._static(path):
                     return
+                self._guard_local(method)
                 self._authorize()
                 status, payload = self._route(method, path.rstrip("/") or "/")
                 self._send(status, payload)
