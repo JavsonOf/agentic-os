@@ -46,6 +46,18 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
+Tytuł: Security and Stability Fixes from the Audit
+
+### Naprawiono
+- Lepsza ochrona serwera uruchomionego bez hasła na własnym komputerze: przyjmuje tylko prośby z tego samego komputera i odrzuca te wysłane przez inne strony internetowe.
+- Klucze API nie trafią tam, gdzie nie powinny:
+  - po zmianie adresu dostawcy modelu albo moda trzeba wpisać klucz ponownie, zamiast wysyłać zapisany pod nowy adres;
+  - połączenie z kluczem nie idzie za przekierowaniem na inny serwer;
+  - edycja dostawcy bez wpisywania klucza nie zastępuje zapisanego klucza jego zamaskowaną wersją („••••”).
+- Kilku agentów może naraz zapisywać wspomnienia: wcześniej odpowiedź potrafiła przepaść z błędem, a plik pamięci mógł się uszkodzić. Pamięć zapisuje się teraz w całości albo wcale.
+- Wgrywanie dokumentów do bazy wiedzy nie przerywa już agentów, którzy w tym czasie z niej korzystają.
+- Nowe komunikaty o tych zabezpieczeniach są wyjaśnione po polsku w War Room.
+
 ## v0.4.0 – "Server Asleep" Screen Instead of a 404
 _31.10.2026_
 

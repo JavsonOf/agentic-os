@@ -9,6 +9,7 @@ the model can cite sources as [1], [2], ...
 from __future__ import annotations
 
 import os
+import threading
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -54,6 +55,8 @@ class RAGPipeline:
         self.chunk_size = chunk_size
         self.overlap = overlap
         self.rrf_k = rrf_k
+        # Uploads add chunks while agents retrieve; both indexes must change together.
+        self._lock = threading.RLock()
 
     def __len__(self) -> int:
         return len(self.vectors)
@@ -63,20 +66,22 @@ class RAGPipeline:
         if isinstance(doc, str):
             doc = Document(doc, metadata)
         ids = []
-        for i, chunk in enumerate(chunk_text(doc.text, self.chunk_size, self.overlap)):
-            cid = f"{doc.id}:{i}"
-            meta = {**doc.metadata, "doc_id": doc.id, "chunk": i}
-            self.vectors.add(chunk, meta, id=cid)
-            self.keywords.add(cid, chunk)
-            ids.append(cid)
+        with self._lock:
+            for i, chunk in enumerate(chunk_text(doc.text, self.chunk_size, self.overlap)):
+                cid = f"{doc.id}:{i}"
+                meta = {**doc.metadata, "doc_id": doc.id, "chunk": i}
+                self.vectors.add(chunk, meta, id=cid)
+                self.keywords.add(cid, chunk)
+                ids.append(cid)
         return ids
 
     def remove_document(self, doc_id: str) -> int:
         """Forget every chunk of one document. Returns how many chunks were removed."""
-        ids = [r.id for r in self.vectors.all() if str(r.metadata.get("doc_id")) == doc_id]
-        for cid in ids:
-            self.vectors.delete(cid)
-            self.keywords.remove(cid)
+        with self._lock:
+            ids = [r.id for r in self.vectors.all() if str(r.metadata.get("doc_id")) == doc_id]
+            for cid in ids:
+                self.vectors.delete(cid)
+                self.keywords.remove(cid)
         return len(ids)
 
     def add_documents(self, docs: list[Document | str]) -> int:
@@ -92,12 +97,13 @@ class RAGPipeline:
         """Return the top ``k`` chunks. ``mode``: ``hybrid``, ``vector`` or ``keyword``."""
         pool = max(k * 4, 10)
         rankings: list[list[str]] = []
-        if mode in ("hybrid", "vector"):
-            rankings.append([h.record.id for h in self.vectors.search(query, k=pool, min_score=0.05)])
-        if mode in ("hybrid", "keyword"):
-            rankings.append([doc_id for doc_id, _ in self.keywords.search(query, k=pool)])
         if mode not in ("hybrid", "vector", "keyword"):
             raise ValueError(f"Unknown retrieval mode: {mode!r}")
+        with self._lock:
+            if mode in ("hybrid", "vector"):
+                rankings.append([h.record.id for h in self.vectors.search(query, k=pool, min_score=0.05)])
+            if mode in ("hybrid", "keyword"):
+                rankings.append([doc_id for doc_id, _ in self.keywords.search(query, k=pool)])
 
         fused: dict[str, float] = {}
         for ranking in rankings:

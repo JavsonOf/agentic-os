@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from agentic_os.llm.base import LLMError, LLMProvider
+from agentic_os.net import same_site
 
 KINDS = ("anthropic", "gemini", "openai_compat")
 
@@ -58,6 +59,14 @@ def mask(key: str) -> str:
     if not key:
         return ""
     return ("•" * 8) + key[-4:] if len(key) >= 16 else "•" * 8
+
+
+def _same_endpoint(old: ProviderConfig, new: ProviderConfig) -> bool:
+    if old.kind != new.kind:
+        return False
+    if not old.base_url or not new.base_url:
+        return old.base_url == new.base_url
+    return same_site(old.base_url, new.base_url)
 
 
 class ProviderRegistry:
@@ -128,7 +137,10 @@ class ProviderRegistry:
             raise ValueError("base_url must start with http:// or https://")
         with self._lock:
             existing = self._items.get(config.id)
-            if keep_existing_key and existing and not config.api_key:
+            if keep_existing_key and existing and (not config.api_key or config.api_key.startswith("•")):
+                if not _same_endpoint(existing, config):
+                    # The stored key was issued for the old address: never send it somewhere new.
+                    raise ValueError("Re-enter the API key when changing the provider address")
                 config.api_key = existing.api_key  # editing other fields keeps the stored key
             self._items[config.id] = config
             self._save()

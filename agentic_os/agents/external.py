@@ -23,6 +23,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from agentic_os import net
 from agentic_os.agents.base import AgentResult
 from agentic_os.llm.base import LLMError
 from agentic_os.llm.openai_compat import post_json
@@ -113,7 +114,7 @@ class ExternalAgent:
         req = urllib.request.Request(self.config.url, data=body, method="POST",
                                      headers={"Content-Type": "application/json", **self._headers()})
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with net.urlopen(req, timeout=self.timeout) as resp:
                 text = resp.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as exc:
             raise LLMError(f"HTTP {exc.code} from webhook: {exc.read().decode('utf-8', 'replace')[:300]}") from exc

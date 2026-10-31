@@ -21,6 +21,11 @@ const ERROR_RULES = [
   [/Przekroczono czas oczekiwania/, "⏱️ Agent pracuje dłużej niż zwykle. Wynik pojawi się w zakładce Zadania, gdy będzie gotowy."],
   [/(?:^|: )No route (?:or item )?for /, "🧩 Ta funkcja nie istnieje na serwerze. Serwer ma starszą wersję niż aplikacja – zrób na serwerze git pull i uruchom go ponownie."],
   [/Request body too large|Plik jest za duży/, "📦 Plik albo tekst jest za duży (limit ok. 60 MB). Podziel go na mniejsze części."],
+  [/Forbidden host: without AGENTIC_OS_API_KEY/, "🔒 Serwer bez hasła przyjmuje połączenia tylko z tego samego komputera (localhost). Żeby wejść z innego adresu, uruchom go z hasłem (AGENTIC_OS_API_KEY)."],
+  [/Cross-site request refused/, "🔒 Serwer odrzucił prośbę z innej strony internetowej. To ochrona przed atakiem – otwórz War Room bezpośrednio z adresu serwera."],
+  [/Re-enter the API key when changing the provider address/, "🔑 Zmieniasz adres dostawcy, więc wpisz klucz API jeszcze raz. Zapisany klucz nie zostanie wysłany pod nowy adres, żeby nie wyciekł."],
+  [/Re-enter the mod's headers when changing its address/, "🔑 Zmieniasz adres moda, więc wpisz jego nagłówki (np. klucz API) jeszcze raz. Zapisane wartości nie zostaną wysłane pod nowy adres."],
+  [/Refused a redirect to another host \(([^)]+)\)/, (m) => `🔑 Usługa przekierowała połączenie na inny serwer (${m[1]}). Zablokowano to, żeby Twój klucz API tam nie trafił. Sprawdź adres w ustawieniach.`],
   [/(?:^|: )Invalid JSON|JSON body must be an object/, "🧩 Aplikacja wysłała niepoprawne dane. Odśwież stronę i spróbuj ponownie."],
 
   /* --------------------------------------------------------- external agents (A2A, webhooks) */
