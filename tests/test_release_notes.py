@@ -147,3 +147,16 @@ def test_indented_sub_points_stay_with_their_point():
     notes = release_notes.notes_since(text, OLD)
     assert "- Nowa rzecz.\n  - pierwsza część\n  - druga część" in notes
     assert release_notes.worth_release(text, text) is False  # sub-points are part of an existing point
+
+
+def test_install_line_replaces_the_closing_sentence_for_one_release():
+    text = (
+        "## v0.3.1 – New Key\n_19.10.2026_\n\n> Instalacja: Najpierw odinstaluj poprzednią wersję.\n\n"
+        "### Zmieniono\n- Nowy klucz.\n\n## v0.3.0 – Team\n\n### Dodano\n- Zespół.\n"
+    )
+    custom = release_notes.install("v0.3.1", text)
+    assert "**AgenticOS_v0.3.1.apk**" in custom and custom.endswith("Najpierw odinstaluj poprzednią wersję.")
+    assert "instaluje się na poprzedniej" not in custom
+    assert release_notes.install("v0.3.0", text).endswith("Nowa wersja instaluje się na poprzedniej.")
+    assert "Najpierw odinstaluj" not in release_notes.notes_for_tag(text, "v0.3.1")
+

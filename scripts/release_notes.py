@@ -17,7 +17,8 @@ for releases published before SemVer). Any other "## ..." heading (normally "Nas
 changes that are not released yet, with optional "Tytuł: English title" and "Wersja: major|minor|patch"
 lines ("Wersja: beta", "Wersja: major rc" etc. publish a test build such as v0.3.0-beta.1 instead;
 "Wersja: build" rebuilds the newest version as v0.2.6+build.1). A release section may carry a "> Uwaga: ..." line,
-shown as a note on the release page. Points are grouped by "### <category>"; points under "Drobne zmiany" never start a release.
+shown as a note on the release page, and a "> Instalacja: ..." line that replaces the closing install sentence
+(e.g. when a new signing key means the old app must be uninstalled first). Points are grouped by "### <category>"; points under "Drobne zmiany" never start a release.
 """
 
 from __future__ import annotations
@@ -37,7 +38,8 @@ TITLE_LINE = re.compile(r"^Tytuł:\s*(.+)$")
 PHASES = ("alpha", "beta", "rc")
 BUMP_LINE = re.compile(r"^Wersja:\s*((?:major|minor|patch)?\s*(?:alpha|beta|rc)?|build)\s*$")
 INSTALL = ("---\n**Instalacja na Androidzie:** otwórz tę stronę na telefonie, dotknij **{apk}** i zezwól "
-           "przeglądarce na instalację, gdy zapyta. Nowa wersja instaluje się na poprzedniej.")
+           "przeglądarce na instalację, gdy zapyta. {how}")
+INSTALL_OVER = "Nowa wersja instaluje się na poprzedniej."
 
 
 def apk_name(tag: str) -> str:
@@ -45,8 +47,10 @@ def apk_name(tag: str) -> str:
     return f"AgenticOS_{tag.replace('+', '_')}.apk"  # "+" breaks downloads on some phones
 
 
-def install(tag: str) -> str:
-    return INSTALL.format(apk=apk_name(tag))
+def install(tag: str, text: str = "") -> str:
+    """The install footer; a "> Instalacja:" line in the tag's section replaces the closing sentence."""
+    how = next((r["install"] for r in releases(text) if r["tag"] == tag and r["install"]), INSTALL_OVER)
+    return INSTALL.format(apk=apk_name(tag), how=how)
 
 
 def parse_version(tag: str) -> tuple[int, int, int] | None:
@@ -72,14 +76,16 @@ def parse(text: str) -> list[tuple[str | None, str, str]]:
 
 
 def releases(text: str) -> list[dict[str, str]]:
-    """Published releases in file order: tag, title, the pre-SemVer tag they replace and a "> Uwaga:" note."""
+    """Published releases in file order: tag, title, the pre-SemVer tag they replace, "> Uwaga:" and "> Instalacja:"."""
     found: list[dict[str, str]] = []
     for line in text.splitlines():
         m = TAG_HEADING.match(line)
         if m:
-            found.append({"tag": m.group(1), "title": (m.group(7) or "").strip(), "old": "", "note": ""})
+            found.append({"tag": m.group(1), "title": (m.group(7) or "").strip(), "old": "", "note": "", "install": ""})
         elif found and line.startswith("> Uwaga:"):
             found[-1]["note"] = line[len("> Uwaga:"):].strip()
+        elif found and line.startswith("> Instalacja:"):
+            found[-1]["install"] = line[len("> Instalacja:"):].strip()
         elif found and not found[-1]["old"] and (old := OLD_TAG.search(line)):
             found[-1]["old"] = old.group(1)
     return found
@@ -240,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.tag:
         note = release_note(text, args.tag)
-        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{install(args.tag)}\n")
+        sys.stdout.write(f"{notes_for_tag(text, args.tag)}\n\n{note + chr(10) + chr(10) if note else ''}{install(args.tag, text)}\n")
         return 0
     previous_ref = next(v for v in (args.since, args.worth_release, args.next_version, args.next_title) if v is not None)
     previous = file_at(previous_ref) if previous_ref else ""
