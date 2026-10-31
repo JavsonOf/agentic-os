@@ -41,10 +41,13 @@ tę linię, następne scalenie wyda wersję stabilną z tym samym numerem (`v0.3
 buduje ostatnią wersję od nowa jako `v0.2.6+build.1`.
 
 Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi się w opisie tego wydania na GitHubie.
+Linia `> Instalacja: …` zastępuje ostatnie zdanie instrukcji instalacji („Nowa wersja instaluje się na poprzedniej.”),
+np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstalować.
 
 ## Następne wydanie
 
-Tytuł: “Server Asleep” Screen Instead of a 404
+## v0.4.0 – "Server Asleep" Screen Instead of a 404
+_31.10.2026_
 
 ### Dodano
 - Ekran „Serwer śpi” zamiast pustej strony z błędem 404, gdy serwer War Room nie odpowiada (np. Codespace zasnął po 30 minutach bez używania).
@@ -55,6 +58,8 @@ Tytuł: “Server Asleep” Screen Instead of a 404
 
 ## v0.3.1 – New Private Signing Key for the Android App
 _19.10.2026_
+
+> Instalacja: Przed instalacją tej wersji raz odinstaluj poprzednią, bo zmienił się klucz podpisu aplikacji. Kolejne wersje będą się już instalować na tej.
 
 ### Zmieniono
 - Aplikacja na Androida jest podpisywana nowym, prywatnym kluczem, którego nie ma w repozytorium. Dzięki temu nikt poza tym projektem nie może wydać wersji, którą telefon uzna za aktualizację.
