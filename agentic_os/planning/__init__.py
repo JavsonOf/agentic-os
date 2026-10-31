@@ -77,15 +77,20 @@ class Plan:
     @classmethod
     def from_dict(cls, data: dict[str, Any], goal: str = "") -> Plan:
         tasks = []
-        for i, item in enumerate(data.get("tasks", []), 1):
+        raw_tasks = data.get("tasks") if isinstance(data, dict) else None
+        for i, item in enumerate(raw_tasks if isinstance(raw_tasks, list) else [], 1):
             if isinstance(item, str):
                 item = {"description": item}
+            if not isinstance(item, dict):
+                continue  # models sometimes emit numbers or nested lists; skip what is not a task
+            deps = item.get("depends_on") or []  # null, a single id or a list
+            agent = item.get("agent")
             tasks.append(
                 Task(
                     id=str(item.get("id") or f"t{i}"),
                     description=str(item.get("description") or item.get("task") or "").strip(),
-                    depends_on=[str(d) for d in item.get("depends_on", [])],
-                    agent=item.get("agent"),
+                    depends_on=[str(d) for d in (deps if isinstance(deps, list) else [deps])],
+                    agent=str(agent) if isinstance(agent, (str, int)) and str(agent).strip() else None,
                 )
             )
         tasks = [t for t in tasks if t.description]
@@ -144,7 +149,7 @@ class Planner:
         response = self.llm.complete([Message.user(prompt)], system=self.system_prompt(), max_tokens=self.max_tokens)
         try:
             plan = Plan.from_dict(extract_json(response.text), goal=goal)
-        except PlanError:
+        except (PlanError, TypeError, AttributeError, ValueError):
             plan = Plan(goal=goal, tasks=[Task(id="t1", description=goal)])
         for t in plan.tasks:
             if t.agent and self.agents and t.agent not in self.agents:

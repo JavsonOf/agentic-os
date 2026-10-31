@@ -63,19 +63,22 @@ set -euo pipefail
 APP_DIR=/opt/agentic-os
 # shellcheck source=/dev/null
 . "$APP_DIR/repo.conf"
+PLAIN="https://github.com/${GITHUB_REPO}.git"
 if [ -n "$GITHUB_TOKEN" ]; then
   URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git"
 else
-  URL="https://github.com/${GITHUB_REPO}.git"
+  URL="$PLAIN"
 fi
+# The token is used only for the fetch itself and never saved in .git/config (readable by the container build).
 if [ ! -d "$APP_DIR/src/.git" ]; then
   git clone --depth 1 --branch "$BRANCH" "$URL" "$APP_DIR/src"
+  git -C "$APP_DIR/src" remote set-url origin "$PLAIN"
   CHANGED=1
 else
-  git -C "$APP_DIR/src" remote set-url origin "$URL"
+  git -C "$APP_DIR/src" remote set-url origin "$PLAIN"
   OLD=$(git -C "$APP_DIR/src" rev-parse HEAD)
-  git -C "$APP_DIR/src" fetch --depth 1 origin "$BRANCH"
-  git -C "$APP_DIR/src" reset --hard "origin/$BRANCH"
+  git -C "$APP_DIR/src" fetch --depth 1 "$URL" "$BRANCH"
+  git -C "$APP_DIR/src" reset --hard FETCH_HEAD
   NEW=$(git -C "$APP_DIR/src" rev-parse HEAD)
   [ "$OLD" != "$NEW" ] && CHANGED=1 || CHANGED=0
 fi

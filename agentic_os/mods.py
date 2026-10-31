@@ -9,7 +9,6 @@ in. GET sends parameters as the query string, other methods as a JSON body.
 from __future__ import annotations
 
 import json
-import os
 import re
 import threading
 import urllib.error
@@ -20,6 +19,7 @@ from typing import Any
 
 from agentic_os import net
 from agentic_os.providers import mask
+from agentic_os.storage import read_json, write_json
 from agentic_os.tools.registry import Tool
 
 _NAME = re.compile(r"[a-zA-Z0-9_-]{1,48}")
@@ -119,17 +119,12 @@ class ModRegistry:
         self.path = path
         self._lock = threading.Lock()
         self._mods: dict[str, Mod] = {}
-        if path and os.path.exists(path):
-            with open(path, encoding="utf-8") as fh:
-                for item in json.load(fh):
-                    self._mods[item["name"]] = mod_from_dict(item)
+        for item in read_json(path, []):
+            self._mods[item["name"]] = mod_from_dict(item)
 
     def _save(self) -> None:
         if self.path:
-            os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-            fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # headers may hold API keys
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump([asdict(m) for m in self._mods.values()], fh)
+            write_json(self.path, [asdict(m) for m in self._mods.values()])  # headers may hold API keys
 
     def add(self, mod: Mod, keep_existing_headers: bool = True) -> Mod:
         mod.validate()

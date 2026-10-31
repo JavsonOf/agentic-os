@@ -9,8 +9,6 @@ half minute while the server runs.
 
 from __future__ import annotations
 
-import json
-import os
 import re
 import threading
 import uuid
@@ -19,8 +17,17 @@ from datetime import datetime, timezone, tzinfo
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from agentic_os.storage import read_json, write_json
+
 DAYS = ("daily", "weekdays", "weekends")
 _TIME = re.compile(r"([01]?\d|2[0-3]):([0-5]\d)")
+
+
+def as_bool(value: Any) -> bool:
+    """JSON true/false, or the strings and numbers a form may send ("false" and "0" mean False)."""
+    if isinstance(value, str):
+        return value.strip().lower() not in ("", "0", "false", "no", "off", "nie")
+    return bool(value)
 
 
 @dataclass
@@ -79,20 +86,14 @@ class ScheduleStore:
         self.path = path
         self._lock = threading.Lock()
         self._items: dict[str, Schedule] = {}
-        if path and os.path.exists(path):
-            with open(path, encoding="utf-8") as fh:
-                for item in json.load(fh):
-                    s = Schedule(**item)
-                    self._items[s.id] = s
+        for item in read_json(path, []):
+            s = Schedule(**item)
+            self._items[s.id] = s
 
     def _save(self) -> None:
         if not self.path:
             return
-        os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-        tmp = f"{self.path}.{uuid.uuid4().hex[:8]}.tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump([asdict(s) for s in self._items.values()], fh)
-        os.replace(tmp, self.path)
+        write_json(self.path, [asdict(s) for s in self._items.values()])
 
     def all(self) -> list[Schedule]:
         return sorted(self._items.values(), key=lambda s: s.time)
@@ -113,15 +114,20 @@ class ScheduleStore:
             self._save()
         return schedule
 
-    def update(self, sid: str, changes: dict[str, Any]) -> Schedule:
+    def update(self, sid: str, changes: dict[str, Any], now: datetime | None = None) -> Schedule:
         with self._lock:
             current = self.get(sid)
             data = asdict(current)
             for key in ("task", "time", "agent", "days", "title", "enabled", "tz"):
                 if key in changes:
-                    data[key] = bool(changes[key]) if key == "enabled" else str(changes[key])
+                    data[key] = as_bool(changes[key]) if key == "enabled" else str(changes[key])
             updated = Schedule(**data)
             updated.validate()
+            now = now or datetime.now(timezone.utc)
+            rescheduled = (updated.time, updated.days, updated.tz) != (current.time, current.days, current.tz)
+            if (rescheduled or (updated.enabled and not current.enabled)) and updated.is_due(now):
+                # Like add(): a time that already passed today starts tomorrow instead of firing at once.
+                updated.last_run = updated.local(now).strftime("%Y-%m-%d")
             self._items[sid] = updated
             self._save()
         return updated

@@ -18,6 +18,9 @@ TEXT_TYPES = {"txt", "md", "markdown", "csv", "json", "log", "html", "htm", "xml
 SUPPORTED = sorted(TEXT_TYPES | {"pdf", "docx"})
 
 
+MAX_DOCX_XML = 100 * 1024 * 1024
+
+
 def file_type(filename: str) -> str:
     return os.path.splitext(filename or "")[1].lower().lstrip(".")
 
@@ -46,7 +49,10 @@ def extract_text(raw: bytes, filename: str) -> str:
 def _docx_text(raw: bytes) -> str:
     try:
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            xml = zf.read("word/document.xml")
+            if zf.getinfo("word/document.xml").file_size > MAX_DOCX_XML:  # a tiny upload that unpacks to gigabytes
+                raise ValueError("Plik .docx jest za duży po rozpakowaniu")
+            with zf.open("word/document.xml") as fh:
+                xml = fh.read(MAX_DOCX_XML + 1)  # reads stop at the declared size, so a lying header cannot grow it
     except (zipfile.BadZipFile, KeyError) as exc:
         raise ValueError("This DOCX file is damaged or is not a Word document") from exc
     ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"

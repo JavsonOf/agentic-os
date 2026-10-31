@@ -21,6 +21,9 @@ on:
       - agentic_os/llm/**
       - .github/workflows/live-test.yml
 
+permissions:
+  contents: read  # tests only read the code
+
 jobs:
   live:
     name: live (${{ matrix.provider }})

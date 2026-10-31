@@ -17,13 +17,12 @@ needs them (progressive disclosure keeps prompts small).
 
 from __future__ import annotations
 
-import json
-import os
 import re
 import threading
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from agentic_os.storage import read_json, write_json
 from agentic_os.tools.registry import Tool
 
 _NAME = re.compile(r"[a-zA-Z0-9_-]{1,64}")
@@ -68,16 +67,12 @@ class SkillRegistry:
         self.path = path
         self._lock = threading.Lock()
         self._skills: dict[str, Skill] = {}
-        if path and os.path.exists(path):
-            with open(path, encoding="utf-8") as fh:
-                for item in json.load(fh):
-                    self._skills[item["name"]] = Skill(**item)
+        for item in read_json(path, []):
+            self._skills[item["name"]] = Skill(**item)
 
     def _save(self) -> None:
         if self.path:
-            os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-            with open(self.path, "w", encoding="utf-8") as fh:
-                json.dump([asdict(s) for s in self._skills.values()], fh)
+            write_json(self.path, [asdict(s) for s in self._skills.values()])
 
     def add(self, skill: Skill) -> Skill:
         skill.validate()

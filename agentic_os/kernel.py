@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import os
 import threading
 import time
@@ -47,6 +48,7 @@ from agentic_os.providers import ProviderRegistry
 from agentic_os.rag.pipeline import Document, RAGPipeline
 from agentic_os.schedules import Schedule, ScheduleStore
 from agentic_os.skills import Skill, SkillRegistry
+from agentic_os.storage import read_json, read_jsonl, write_json
 from agentic_os.tools.builtin import builtin_tools
 from agentic_os.tools.registry import Tool, ToolRegistry, make_tool
 
@@ -72,6 +74,9 @@ PERMISSION_NOTES = {
     "full": "\n\nYou have full access to every tool and agent in this system and no confirmations are required. "
             "Work autonomously, state your assumptions, and avoid irreversible actions the task does not need.",
 }
+
+
+log = logging.getLogger("agentic_os.kernel")
 
 
 class AgenticOSError(RuntimeError):
@@ -244,7 +249,7 @@ class _ReflectiveRunner:
 class AgenticOS:
     """Create one instance per application; it owns all agents and services."""
 
-    def __init__(self, settings: Settings | None = None, llm: LLMProvider | None = None, max_workers: int = 4) -> None:
+    def __init__(self, settings: Settings | None = None, llm: LLMProvider | None = None, max_workers: int = 16) -> None:
         self.settings = settings or Settings()
         self.llm = llm or create_llm(self.settings)
         self.tracer = Tracer()
@@ -299,28 +304,12 @@ class AgenticOS:
         return os.path.join(self.settings.data_dir, name) if self.settings.data_dir else None
 
     def _load_json(self, name: str, default: Any) -> Any:
-        path = self._path(name)
-        if not path or not os.path.exists(path):
-            return default
-        with open(path, encoding="utf-8") as fh:
-            return json.load(fh)
+        return read_json(self._path(name), default)
 
     def _save_json(self, name: str, data: Any) -> None:
         path = self._path(name)
-        if not path:
-            return
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        # write a private temp file and swap it in, so a concurrent reader never sees a half-written file
-        tmp = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # may hold API keys
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump(data, fh)
-            os.replace(tmp, path)
-        except BaseException:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-            raise
+        if path:
+            write_json(path, data)  # atomic and owner-only: may hold API keys
 
     def _restore(self, saved_specs: list[dict[str, Any]]) -> None:
         """Re-create saved agents and re-ingest saved knowledge after a restart."""
@@ -334,16 +323,24 @@ class AgenticOS:
                     else:
                         if spec.pop("approval", False):  # older specs stored a yes/no approval flag
                             spec.setdefault("permission", "ask")
-                        self.spawn(spec.pop("name"), **spec)
+                        name = spec.pop("name")
+                        try:
+                            self.spawn(name, **spec)
+                        except (LLMError, ValueError) as exc:
+                            if not spec.get("provider"):
+                                raise
+                            # Its provider is gone or broken: keep the agent on the default model instead
+                            # of dropping it (the next save would otherwise delete it for good).
+                            log.warning("Agent %s: provider %s unavailable (%s), using the default model",
+                                        name, spec.get("provider"), exc)
+                            spec.pop("provider", None)
+                            spec.pop("model", None)
+                            self.spawn(name, **spec)
                 except (LLMError, ValueError, TypeError):
                     continue  # skip a spec that no longer works rather than failing startup
-            path = self._path("knowledge.jsonl")
-            if path and os.path.exists(path):
-                with open(path, encoding="utf-8") as fh:
-                    for line in fh:
-                        if line.strip():
-                            item = json.loads(line)
-                            self.knowledge.add_document(Document(item["text"], item.get("metadata", {}), id=item["id"]))
+            for item in read_jsonl(self._path("knowledge.jsonl")):  # a line cut short by a crash is skipped
+                if isinstance(item, dict) and "text" in item and "id" in item:
+                    self.knowledge.add_document(Document(item["text"], item.get("metadata", {}), id=item["id"]))
         finally:
             self._restoring = False
 
@@ -361,6 +358,16 @@ class AgenticOS:
                     self.tools.register(t)
             except MCPError:
                 pass  # status shows the error; the user can retry from the UI
+
+    def remove_provider(self, provider_id: str) -> bool:
+        """Delete a provider; agents that used it switch to the default model instead of disappearing."""
+        if not self.providers.remove(provider_id):
+            return False
+        for name, spec in list(self._specs.items()):
+            if spec.get("type", "native") == "native" and spec.get("provider") == provider_id:
+                kept = {k: v for k, v in spec.items() if k not in ("type", "name", "provider", "model", "approval")}
+                self.spawn(name, **kept)
+        return True
 
     def _save_mcp(self) -> None:
         self._save_json("mcp.json", [c.config.__dict__ for c in self.mcp.values()])
@@ -753,6 +760,8 @@ class AgenticOS:
                         max_tokens=1500,
                     )
                     facts = extract_json(reply.text).get("facts") or []
+                    if not isinstance(facts, list):  # a bare string would otherwise be stored letter by letter
+                        facts = [facts]
                 except (LLMError, PlanError, ValueError):
                     continue
                 for fact in facts[:10]:
@@ -796,9 +805,9 @@ class AgenticOS:
         found = self.knowledge.remove_document(doc_id) > 0
         path = self._path("knowledge.jsonl")
         if path and os.path.exists(path):
-            with self._lock, open(path, encoding="utf-8") as fh:
-                kept = [line for line in fh if line.strip() and json.loads(line).get("id") != doc_id]
-            with self._lock:
+            with self._lock:  # ingest appends under the same lock, so no line lands in between
+                kept = [json.dumps(item) + "\n" for item in read_jsonl(path)
+                        if isinstance(item, dict) and item.get("id") != doc_id]
                 tmp = f"{path}.{uuid.uuid4().hex[:8]}.tmp"
                 with open(tmp, "w", encoding="utf-8") as fh:
                     fh.writelines(kept)
@@ -818,7 +827,7 @@ class AgenticOS:
         path = self._path("knowledge.jsonl")
         if path:
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "a", encoding="utf-8") as fh:
+            with self._lock, open(path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps({"id": doc.id, "text": doc.text, "metadata": doc.metadata}) + "\n")
         return chunks
 
@@ -828,7 +837,16 @@ class AgenticOS:
         proc = Process(pid=uuid.uuid4().hex[:10], agent=agent, task=task)
         with self._lock:
             self.processes[proc.pid] = proc
+            self._prune_processes()
         return proc
+
+    MAX_FINISHED_PROCESSES = 500
+
+    def _prune_processes(self) -> None:
+        """Forget the oldest finished processes so a long-running server does not grow without end."""
+        finished = [pid for pid, p in self.processes.items() if p.status in ("completed", "failed")]
+        for pid in finished[: max(0, len(finished) - self.MAX_FINISHED_PROCESSES)]:
+            del self.processes[pid]
 
     def _with_mode(self, proc: Process, runner: Any) -> Any:
         """Apply the agent's thinking mode (reflective / adaptive) for this run."""
@@ -955,6 +973,7 @@ class AgenticOS:
         proc = Process(pid=uuid.uuid4().hex[:10], agent=f"crew:{process}", task=task)
         with self._lock:
             self.processes[proc.pid] = proc
+            self._prune_processes()
         proc._future = self._executor.submit(self._execute, proc, None, _CrewRunner())
         return proc
 
@@ -1037,7 +1056,10 @@ class AgenticOS:
 
         def loop() -> None:
             while not stop.wait(interval):
-                self.run_due_schedules()
+                try:
+                    self.run_due_schedules()
+                except Exception:
+                    log.exception("Scheduler tick failed")
 
         threading.Thread(target=loop, name="agentic-os-scheduler", daemon=True).start()
 

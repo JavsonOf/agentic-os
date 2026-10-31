@@ -46,7 +46,35 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Security and Stability Fixes from the Audit
+Tytuł: Reliability Fixes: Safe Saving, Planner, Schedules and Models
+
+### Naprawiono
+- Ustawienia, agenci, skille, mody, harmonogram i pamięć zapisują się bezpiecznie: awaria w trakcie zapisu nie zostawia już uszkodzonego pliku.
+  - Gdy jakiś plik jednak jest uszkodzony, serwer odkłada go na bok i normalnie startuje, zamiast się nie uruchamiać.
+  - Urwana linia w bazie wiedzy jest pomijana, a reszta dokumentów zostaje.
+- Usunięcie dostawcy modelu nie kasuje już agentów, którzy z niego korzystali: przechodzą na model domyślny.
+- Planowanie celów i pracy zespołu agentów nie kończy się błędem, gdy model zwróci nietypowy plan.
+- Modele zgodne z OpenAI z niższym limitem odpowiedzi (np. DeepSeek) i nowsze modele OpenAI działają: aplikacja sama dopasowuje limit po pierwszej odmowie.
+- Przełączenie modelu w trakcie rozmowy (np. z Claude na Gemini) nie psuje już tej rozmowy.
+- Harmonogram:
+  - zmiana godziny albo ponowne włączenie zadania po jego porze nie uruchamia go od razu, tylko następnego dnia;
+  - „wyłączone” wysłane jako tekst naprawdę wyłącza zadanie;
+  - jeden błąd (np. pełny dysk) nie zatrzymuje już harmonogramu na stałe.
+- Hasło do War Room ze spacją albo nową linią na końcu (np. z pliku .env) już nie blokuje logowania.
+- Obraz Dockera ma obsługę PDF i gotowy folder na dane, więc zapisywanie działa od razu po podpięciu wolumenu.
+
+### Ulepszono
+- Więcej zadań może naraz czekać na Twoją zgodę lub odpowiedź, nie blokując czatu.
+- Serwer działający długo nie zajmuje coraz więcej pamięci: pamięta ostatnie 500 zakończonych zadań.
+- Bezpieczeństwo:
+  - po wielu próbach z błędnym hasłem trzeba odczekać kilka minut;
+  - serwery MCP uruchamiane na serwerze nie dostają jego kluczy i haseł;
+  - zbyt duże albo podejrzane pliki i obliczenia są odrzucane, zamiast obciążać serwer;
+  - automatyczne wdrożenie na Oracle nie zapisuje tokenu GitHuba w plikach repozytorium.
+- Dokumentacja: aktualna lista funkcji serwera w README i poprawna komenda Dockera z trwałymi danymi.
+
+## v0.4.1 – Security and Stability Fixes from the Audit
+_31.10.2026_
 
 ### Naprawiono
 - Lepsza ochrona serwera uruchomionego bez hasła na własnym komputerze: przyjmuje tylko prośby z tego samego komputera i odrzuca te wysłane przez inne strony internetowe.

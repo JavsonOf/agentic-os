@@ -46,8 +46,10 @@ def safe_eval(expression: str) -> float | int:
             return node.value
         if isinstance(node, ast.BinOp) and type(node.op) in _BIN_OPS:
             left, right = ev(node.left), ev(node.right)
-            if isinstance(node.op, ast.Pow) and abs(right) > 1000:
-                raise ValueError("exponent too large")
+            if isinstance(node.op, ast.Pow) and (abs(right) > 1000 or _bits(left) * abs(right) > 100_000):
+                raise ValueError("exponent too large")  # ((9**999)**999)**999 would need gigabytes
+            if isinstance(node.op, ast.Mult) and _bits(left) + _bits(right) > 100_000:
+                raise ValueError("number too large")
             return _BIN_OPS[type(node.op)](left, right)
         if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
             return _UNARY_OPS[type(node.op)](ev(node.operand))
@@ -60,6 +62,11 @@ def safe_eval(expression: str) -> float | int:
     if len(expression) > 500:
         raise ValueError("expression too long")
     return ev(ast.parse(expression.replace("^", "**"), mode="eval"))
+
+
+def _bits(value: float) -> int:
+    """Size of a number in bits; floats are bounded already and count as small."""
+    return abs(value).bit_length() if isinstance(value, int) else 64
 
 
 @tool(tags=["math", "core", "readonly"])

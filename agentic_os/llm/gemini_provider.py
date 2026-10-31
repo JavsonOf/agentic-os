@@ -81,11 +81,17 @@ class GeminiProvider(LLMProvider):
                     ]
                 )
             ]
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=to_gemini_contents(messages),
-            config=types.GenerateContentConfig(**config),
-        )
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=to_gemini_contents(messages),
+                config=types.GenerateContentConfig(**config),
+            )
+        except Exception as exc:
+            if not type(exc).__module__.startswith("google"):
+                raise
+            # SDK errors (bad key, quota, invalid request) become LLMError so callers handle them as such.
+            raise LLMError(f"Gemini API error: {type(exc).__name__}: {exc}") from exc
         return from_gemini_response(response, self.model)
 
 
@@ -111,7 +117,7 @@ def to_gemini_contents(messages: list[Message]) -> list[Any]:
         elif msg.role == "assistant":
             for call in msg.tool_calls:
                 call_names[call.id] = call.name
-            if msg.raw is not None:
+            if msg.raw is not None and hasattr(msg.raw, "parts"):  # Gemini's own content; others are rebuilt
                 push("model", list(msg.raw.parts or []))
                 continue
             parts: list[Any] = []

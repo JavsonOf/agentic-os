@@ -88,6 +88,8 @@ CASES = [
     ("KeyError: 'foo'", 'nieoczekiwany'),
     ('Forbidden host: without AGENTIC_OS_API_KEY only localhost is accepted', 'localhost'),
     ('Cross-site request refused', 'innej strony'),
+    ('Too many wrong passwords, try again in a few minutes', 'odczekaj'),
+    ('Invalid Content-Length', 'niepoprawne dane'),
     ('Re-enter the API key when changing the provider address', 'klucz API jeszcze raz'),
     ("Re-enter the mod's headers when changing its address", 'nagłówki'),
     ('HTTP Error 302: Refused a redirect to another host (evil.example) so the API key is not sent there', 'evil.example'),

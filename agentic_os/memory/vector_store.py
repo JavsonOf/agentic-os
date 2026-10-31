@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from agentic_os.memory.embeddings import Embedder, HashingEmbedder, cosine
+from agentic_os.storage import read_json
 
 
 @dataclass
@@ -103,8 +104,7 @@ class VectorStore:
                 raise
 
     def load(self, path: str) -> None:
-        with open(path, encoding="utf-8") as fh:
-            items = json.load(fh)
+        items = read_json(path, [])  # a damaged file is set aside instead of blocking startup
         with self._lock:
             for item in items:
                 rec = Record(**item)
