@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Serwer śpi · Agentic OS</title>
+  <meta name="theme-color" content="#0d1513">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <!-- Rescue screen. The service worker serves it from cache when the server does not answer (e.g. a sleeping
+       Codespace returns 404), so it must work with no network: everything is inline. -->
+  <style>
+    :root {
+      --bg: #0d1513; --glow: #2bb3a3; --text: #e9ecea; --muted: #9aa39e; --card: rgba(255,255,255,.06);
+      --border: rgba(255,255,255,.12); --accent: #2bb3a3; --on-accent: #06201d; --ok: #4ade80; --code: #071210;
+      color-scheme: dark;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #eef4f2; --glow: #0f766e; --text: #1a1d1c; --muted: #5f6763; --card: rgba(255,255,255,.8);
+        --border: #d6dedb; --accent: #0f766e; --on-accent: #fff; --ok: #166534; --code: #10201d; color-scheme: light; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--glow) 22%, var(--bg)) 0%, var(--bg) 60%);
+      color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; justify-content: center; padding: max(28px, env(safe-area-inset-top)) 16px 40px; }
+    main { width: 100%; max-width: 460px; }
+    .moon { position: relative; width: 132px; height: 132px; margin: 8px auto 18px; }
+    .orb { position: absolute; inset: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffff55, transparent 45%), var(--accent);
+      box-shadow: 0 0 60px color-mix(in srgb, var(--glow) 70%, transparent); animation: breathe 4s ease-in-out infinite; }
+    .orb::after { content: ""; position: absolute; left: 26%; right: 26%; top: 52%; height: 10px; border-bottom: 4px solid var(--on-accent);
+      border-radius: 0 0 40px 40px; opacity: .8; } /* sleepy closed-eye smile */
+    .z { position: absolute; font-weight: 800; color: var(--accent); opacity: 0; animation: float 3.6s ease-in infinite; }
+    .z1 { right: 6px; top: 22px; font-size: 18px; }
+    .z2 { right: -6px; top: 4px; font-size: 24px; animation-delay: 1.2s; }
+    .z3 { right: -18px; top: -14px; font-size: 30px; animation-delay: 2.4s; }
+    .awake .orb { animation: pop .6s ease-out; background: var(--ok); }
+    .awake .z { display: none; }
+    @keyframes breathe { 50% { transform: scale(.94); box-shadow: 0 0 30px color-mix(in srgb, var(--glow) 40%, transparent); } }
+    @keyframes float { 0% { opacity: 0; transform: translate(0, 10px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(14px, -22px); } }
+    @keyframes pop { 40% { transform: scale(1.15); } }
+    h1 { font-size: 28px; line-height: 1.15; margin: 0 0 8px; text-align: center; letter-spacing: -.01em; }
+    .lead { color: var(--muted); text-align: center; margin: 0 0 20px; }
+    .status { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 0 auto 22px; padding: 8px 14px; width: fit-content;
+      border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: 14px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); animation: blink 1.4s infinite; }
+    .awake .dot { background: var(--ok); animation: none; }
+    @keyframes blink { 50% { opacity: .3; } }
+    ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; counter-reset: step; }
+    li { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; backdrop-filter: blur(6px); }
+    li::before { counter-increment: step; content: counter(step); display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 10px;
+      border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 14px; vertical-align: middle; }
+    li strong { vertical-align: middle; }
+    li p { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+    pre { margin: 10px 0 0; padding: 12px; border-radius: 12px; background: var(--code); color: #d7f5ef; font: 13px/1.55 ui-monospace, Menlo, Consolas, monospace;
+      white-space: pre-wrap; word-break: break-all; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; margin-top: 10px; border: 0; border-radius: 14px;
+      background: var(--accent); color: var(--on-accent); font-family: inherit; font-size: 16px; font-weight: 600; text-decoration: none; cursor: pointer; }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .foot { margin-top: 18px; text-align: center; color: var(--muted); font-size: 13px; }
+    @media (prefers-reduced-motion: reduce) { .orb, .z, .dot { animation: none !important; } .z { opacity: .8; } }
+  </style>
+</head>
+<body>
+  <main id="wake">
+    <div class="moon" aria-hidden="true"><div class="orb"></div><span class="z z1">z</span><span class="z z2">z</span><span class="z z3">Z</span></div>
+    <h1 id="title">Serwer śpi</h1>
+    <p class="lead" id="lead">Twoi agenci są bezpieczni. Serwer, na którym działają, po prostu zasnął. Na GitHub Codespaces dzieje się to po ok. 30 minutach bez używania.</p>
+    <div class="status" role="status" aria-live="polite"><span class="dot"></span><span id="status-text">Czekam, aż serwer wstanie…</span></div>
+
+    <ol>
+      <li><strong>Obudź Codespace</strong>
+        <p>Otwórz swój Codespace i poczekaj, aż pojawi się terminal.</p>
+        <a class="btn" href="https://github.com/codespaces" target="_blank" rel="noopener">Otwórz Codespaces</a>
+      </li>
+      <li><strong>Włącz serwer War Room</strong>
+        <p>Wklej w terminalu. Przy haśle znaki są niewidoczne, tak ma być.</p>
+        <pre id="cmd">cd /workspaces/agentic-os
+read -s -p "Hasło War Room: " AGENTIC_OS_API_KEY; echo; export AGENTIC_OS_API_KEY
+export AGENTIC_OS_DATA_DIR="$HOME/agentic-os-data"
+agentic-os serve --host 0.0.0.0 --port 8000</pre>
+        <button class="btn ghost" type="button" id="copy">Kopiuj komendy</button>
+      </li>
+      <li><strong>Gotowe, nic więcej nie rób</strong>
+        <p>Ta strona sama sprawdza serwer co 5 sekund i wróci do War Room, gdy tylko wstanie.</p>
+      </li>
+    </ol>
+    <button class="btn ghost" type="button" id="retry">Sprawdź teraz</button>
+    <p class="foot">Agentic OS · ekran działa także bez internetu</p>
+  </main>
+  <script>
+    (function () {
+      var root = document.getElementById("wake"), text = document.getElementById("status-text");
+      var copyBtn = document.getElementById("copy"), done = false, timer;
+      function stamp() { return new Date().toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+      function check() {
+        if (done) return;
+        fetch("/health", { cache: "no-store" }).then(function (r) {
+          return r.ok ? r.json() : null;
+        }).then(function (body) {
+          if (body && body.status === "ok") {
+            done = true; clearInterval(timer);
+            root.classList.add("awake");
+            document.getElementById("title").textContent = "Serwer wstał!";
+            text.textContent = "Wracam do War Room…";
+            setTimeout(function () { location.replace("/"); }, 900);
+          } else { text.textContent = "Jeszcze śpi · sprawdzono " + stamp(); }
+        }).catch(function () { text.textContent = "Jeszcze śpi · sprawdzono " + stamp(); });
+      }
+      copyBtn.addEventListener("click", function () {
+        var cmd = document.getElementById("cmd").textContent;
+        var ok = function () { copyBtn.textContent = "Skopiowano ✓"; setTimeout(function () { copyBtn.textContent = "Kopiuj komendy"; }, 2000); };
+        if (navigator.clipboard) navigator.clipboard.writeText(cmd).then(ok, function () {});
+      });
+      document.getElementById("retry").addEventListener("click", check);
+      timer = setInterval(check, 5000);
+      check();
+    })();
+  </script>
+</body>
+</html>

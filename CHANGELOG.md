@@ -44,7 +44,17 @@ Pod nagłówkiem wydanej wersji możesz dopisać linię `> Uwaga: …`. Pojawi s
 
 ## Następne wydanie
 
-Tytuł: New Private Signing Key for the Android App
+Tytuł: “Server Asleep” Screen Instead of a 404
+
+### Dodano
+- Ekran „Serwer śpi” zamiast pustej strony z błędem 404, gdy serwer War Room nie odpowiada (np. Codespace zasnął po 30 minutach bez używania).
+  - Wyjaśnia po ludzku, co się stało, i zapewnia, że agenci i dane są bezpieczne.
+  - Prowadzi w 3 krokach: przycisk otwierający Codespaces, gotowe komendy do włączenia serwera z przyciskiem „Kopiuj komendy” i hasłem wpisywanym tak, żeby nie było go widać.
+  - Sam sprawdza serwer co 5 sekund i od razu wraca do War Room, gdy ten wstanie. Nic nie trzeba odświeżać.
+  - Działa w przeglądarce i w aplikacji na Androida, także bez internetu, w jasnym i ciemnym motywie.
+
+## v0.3.1 – New Private Signing Key for the Android App
+_19.10.2026_
 
 ### Zmieniono
 - Aplikacja na Androida jest podpisywana nowym, prywatnym kluczem, którego nie ma w repozytorium. Dzięki temu nikt poza tym projektem nie może wydać wersji, którą telefon uzna za aktualizację.
