@@ -12,7 +12,7 @@ edycja wysłanej wiadomości w czacie oraz to, co uznam za przydatne z listy pri
 | #32 | claude/audit-medium-low | 4d91415 | main (e22a739) | draft, CI zielone, czeka na „scal” → v0.4.2 |
 | #33 | claude/agent-screen | 1f68246 | claude/audit-medium-low | draft, CI zielone, czeka na „scal” |
 | #34 | claude/ux-edit-undo | 378ff99 (z tym plikiem) | claude/agent-screen | draft, CI zielone, czeka na „scal” |
-| #35? | claude/android-camera-mic-back | (nowy) | claude/ux-edit-undo | Android: aparat, mikrofon, gest wstecz |
+| #35 | claude/android-camera-mic-back | 943066b | claude/ux-edit-undo | draft, CI zielone (testy + build APK), czeka na „scal” |
 
 #33 i #34 mają wspólną sekcję „Następne wydanie” w CHANGELOG → razem v0.5.0.
 
@@ -38,11 +38,12 @@ edycja wysłanej wiadomości w czacie oraz to, co uznam za przydatne z listy pri
 ## Zostało
 - [ ] Czekać na „scal” od użytkownika (nie scalać samodzielnie)
 - [ ] Przed scaleniem: usunąć PROGRESS.md osobnym commitem w #34 i w PR Androida (oba go mają)
-- [ ] Sprawdzić build APK w CI na PR Androida
-- [ ] Scalanie po kolei: #32 → #33 → #34, potem sprawdzić wydania i opisy
+- [x] Build APK w CI na #35: zielony
+- [x] Użytkownik potwierdził stan po autocompact („Zatwierdzam”)
+- [ ] Scalanie po kolei: #32 → #33 → #34 → #35, potem sprawdzić wydania i opisy
 - Otwarte poza tym: kopia zapasowa keystore (czeka na `ls ~/agentic-os-signing/` od użytkownika),
   domyślne uprawnienie agenta `ask` vs `auto`, PR #22 wstrzymany.
 - Niepewne: czy WebView na telefonie użytkownika ma BarcodeDetector (jeśli nie – komunikat, wpisanie ręczne).
 
 ## Następny krok
-Czekam na potwierdzenie użytkownika.
+Czekam na „scal” (np. „scal wszystkie”). Przed scaleniem #34 i #35 usunąć PROGRESS.md.
