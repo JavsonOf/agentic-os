@@ -252,6 +252,7 @@ class AgenticOS:
     def __init__(self, settings: Settings | None = None, llm: LLMProvider | None = None, max_workers: int = 16) -> None:
         self.settings = settings or Settings()
         self.llm = llm or create_llm(self.settings)
+        self._base_llm = self.llm  # the model from settings/env, used again when the default provider is removed
         self.tracer = Tracer()
         self.metrics = Metrics()
         data_dir = self.settings.data_dir
@@ -363,6 +364,16 @@ class AgenticOS:
         """Delete a provider; agents that used it switch to the default model instead of disappearing."""
         if not self.providers.remove(provider_id):
             return False
+        if self.prefs.get("default_provider") == provider_id:
+            # Fall back to the settings/env model, so the app no longer reports the removed provider as connected.
+            self.llm = self._base_llm
+            for agent in self.agents.values():
+                if isinstance(agent, Agent) and not getattr(agent, "provider_id", None):
+                    agent.llm = self.llm
+                    agent.model_name = getattr(self.llm, "model", None)
+            self.prefs.pop("default_provider", None)
+            self.prefs.pop("default_model", None)
+            self._save_json("settings.json", self.prefs)
         for name, spec in list(self._specs.items()):
             if spec.get("type", "native") == "native" and spec.get("provider") == provider_id:
                 kept = {k: v for k, v in spec.items() if k not in ("type", "name", "provider", "model", "approval")}

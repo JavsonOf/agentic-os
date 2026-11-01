@@ -46,7 +46,22 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Today Feed on the Start Screen
+Tytuł: Connect AI in 60 Seconds
+
+### Dodano
+- „Połącz AI w 60 sekund”: prowadzone podłączenie modelu AI zamiast długiego formularza. Otwiera się z przycisku „Połącz AI” na ekranie startowym i w zakładce Modele.
+  - Wybór jednym dotknięciem: Google Gemini (darmowy, zalecany), OpenRouter (darmowe modele) albo Anthropic Claude.
+  - Krótka instrukcja i link prosto do strony, na której tworzy się klucz.
+  - Pole klucza z przyciskiem „Wklej” i podpowiedzią, gdy klucz wygląda na niepełny.
+  - Klucz od razu jest sprawdzany. Po sukcesie: „Gotowe!” i przycisk „Zadaj pierwsze pytanie” z gotowym pytaniem na start.
+  - Inni dostawcy (OpenAI, Groq, Ollama…) dalej są w zakładce Modele.
+
+### Naprawiono
+- Usunięcie dostawcy ustawionego jako domyślny przywraca model z ustawień serwera. Wcześniej aplikacja dalej pokazywała go jako połączony, choć nie działał.
+- Klucz, który nie przeszedł sprawdzenia w „Połącz AI”, nie zostaje zapisany jako działający dostawca.
+
+## v0.6.0 – Today Feed on the Start Screen
+_01.11.2026_
 
 ### Dodano
 - Sekcja „Na dziś” na ekranie startowym: od razu widać, co wymaga uwagi i co agenci zrobili, gdy Cię nie było.
