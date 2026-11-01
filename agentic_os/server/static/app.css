@@ -585,3 +585,27 @@ input.need { border-color: var(--warn-pill); }
 .hist-item:focus-within, .hist-item:hover { border-color: var(--accent); }
 .hist-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 6px 10px 12px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 18px; }
 .hist-item .reply-act { font-size: 15px; }
+/* Markdown in agent replies */
+.msg.agent .md { white-space: normal; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.md > * { margin: 0; }
+.md h3 { font-size: 17px; line-height: 1.3; font-weight: 800; letter-spacing: -0.2px; margin-top: 4px; }
+.md h4 { font-size: 15px; line-height: 1.35; font-weight: 800; }
+.md ul, .md ol { padding-left: 22px; display: flex; flex-direction: column; gap: 4px; }
+.md li::marker { color: var(--accent); font-weight: 700; }
+.md .md-sub { margin-top: 3px; color: var(--text-2); }
+.md blockquote { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; color: var(--text-2); }
+.md hr { border: 0; border-top: 1px solid var(--border); width: 100%; }
+.md a { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; word-break: break-word; }
+.md-code { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
+.md-code-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 4px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.code-copy { min-height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.code-copy:hover, .code-copy:focus-visible { background: var(--surface); color: var(--text); }
+.md-code pre { margin: 0; padding: 10px 12px; overflow-x: auto; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; }
+.md-code code { background: none; padding: 0; font-size: inherit; }
+.md-table { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.md table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+.md th, .md td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+.md th { background: var(--surface-2); font-weight: 700; }
+.md tr:last-child td { border-bottom: 0; }
+/* Notices stay readable above an open sheet instead of covering its list. */
+.sheet-overlay:not(.hidden) ~ .toast, .sheet-overlay:not(.hidden) ~ .snackbar { bottom: auto; top: calc(env(safe-area-inset-top) + 14px); }

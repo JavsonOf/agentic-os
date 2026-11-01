@@ -46,7 +46,23 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Conversation History
+Tytuł: Formatted Replies: Lists, Tables and Code
+
+### Dodano
+- Odpowiedzi agentów są ładnie sformatowane, zamiast pokazywać surowe znaczki Markdown (#, *, |, ```).
+  - Nagłówki, listy punktowane i numerowane (także z podpunktami), cytaty i linie oddzielające.
+  - Tabele z nagłówkiem, które na wąskim ekranie przewijają się w bok.
+  - Bloki kodu z nazwą języka i przyciskiem „Kopiuj”, który kopiuje sam kod.
+  - Klikalne linki, otwierane w nowej karcie (tylko adresy http i https).
+  - Pogrubienie, kursywa i kod w tekście.
+  - Formatowanie jest bezpieczne: HTML w odpowiedzi agenta pokazuje się jako zwykły tekst i nigdy się nie wykonuje.
+
+### Ulepszono
+- Podglądy odpowiedzi w sekcji „Na dziś” pokazują czysty tekst, bez znaczków formatowania.
+- Powiadomienia (np. „Skopiowano”) przy otwartym oknie pojawiają się u góry ekranu, zamiast zasłaniać listę w oknie.
+
+## v0.9.0 – Conversation History
+_01.11.2026_
 
 ### Dodano
 - Historia rozmów w czacie, jak w innych aplikacjach AI: przycisk „Rozmowy” w nagłówku rozmowy.
