@@ -88,6 +88,95 @@ function richText(text) {
   }
   return frag;
 }
+/* Agent replies in Markdown, built as DOM nodes (never innerHTML), so model output cannot inject markup:
+   headings, lists, quotes, tables, code blocks with "Kopiuj", links (http/https only), bold, italic, code. */
+function inlineMd(text) {
+  const frag = document.createDocumentFragment();
+  const re = /(`[^`\n]+`|\*\*[^*\n]+\*\*|(?<![\w])__[^_\n]+__(?![\w])|\*[^*\s][^*\n]*\*|\[[^\]\n]+\]\((https?:\/\/[^\s)]+)\)|https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
+  let last = 0; let m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) frag.append(document.createTextNode(text.slice(last, m.index)));
+    const t = m[0];
+    if (t.startsWith("`")) frag.append(el("code", { text: t.slice(1, -1) }));
+    else if (t.startsWith("**") || t.startsWith("__")) frag.append(el("strong", {}, inlineMd(t.slice(2, -2))));
+    else if (t.startsWith("*")) frag.append(el("em", {}, inlineMd(t.slice(1, -1))));
+    else if (t.startsWith("[")) frag.append(el("a", { href: m[2], target: "_blank", rel: "noopener noreferrer", text: t.slice(1, t.indexOf("](")) }));
+    else frag.append(el("a", { href: t, target: "_blank", rel: "noopener noreferrer", text: t }));
+    last = re.lastIndex;
+  }
+  if (last < text.length) frag.append(document.createTextNode(text.slice(last)));
+  return frag;
+}
+function codeBlock(code, lang) {
+  const copy = el("button", { type: "button", class: "code-copy", text: "Kopiuj", onclick: async () => {
+    try { await navigator.clipboard.writeText(code); copy.textContent = "Skopiowano ✓"; setTimeout(() => { copy.textContent = "Kopiuj"; }, 1500); }
+    catch { toast("Nie udało się skopiować", true); }
+  } });
+  return el("div", { class: "md-code" }, el("div", { class: "md-code-head" }, el("span", { text: lang || "kod" }), copy), el("pre", {}, el("code", { text: code })));
+}
+function markdown(text) {
+  const box = el("div", { class: "md" });
+  const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  const isTableRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    const fence = /^\s*```\s*([\w+-]*)/.exec(line);
+    if (fence) {
+      const code = []; i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++]);
+      i++; box.append(codeBlock(code.join("\n"), fence[1])); continue;
+    }
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (h) { box.append(el(h[1].length <= 2 ? "h3" : "h4", {}, inlineMd(h[2].replace(/\s#+\s*$/, "")))); i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { box.append(el("hr")); i++; continue; }
+    if (isTableRow(line) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      const head = cells(line); i += 2;
+      const rows = [];
+      while (i < lines.length && isTableRow(lines[i])) rows.push(cells(lines[i++]));
+      box.append(el("div", { class: "md-table" }, el("table", {},
+        el("thead", {}, el("tr", {}, ...head.map((c) => el("th", {}, inlineMd(c))))),
+        el("tbody", {}, ...rows.map((r) => el("tr", {}, ...head.map((_, k) => el("td", {}, inlineMd(r[k] || "")))))))));
+      continue;
+    }
+    if (/^\s*>/.test(line)) {
+      const q = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) q.push(lines[i++].replace(/^\s*>\s?/, ""));
+      box.append(el("blockquote", {}, ...Array.from(markdown(q.join("\n")).childNodes))); continue;
+    }
+    const li = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(line);
+    if (li) {
+      const ordered = /\d/.test(li[2]);
+      const list = el(ordered ? "ol" : "ul");
+      if (ordered && parseInt(li[2], 10) > 1) list.setAttribute("start", String(parseInt(li[2], 10)));
+      while (i < lines.length) {
+        const m = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(lines[i]);
+        if (m && /\d/.test(m[2]) === ordered && m[1].length < 2) { list.append(el("li", {}, inlineMd(m[3]))); i++; continue; }
+        if (m || (/^\s{2,}\S/.test(lines[i]) && list.lastChild)) { // nested item or continuation: keep it under the last item
+          const text = m ? m[3] : lines[i].trim();
+          list.lastChild.append(el("div", { class: "md-sub" }, m ? "• " : "", inlineMd(text))); i++; continue;
+        }
+        break;
+      }
+      box.append(list); continue;
+    }
+    const para = [];
+    while (i < lines.length && lines[i].trim() && !/^\s*(```|#{1,6}\s|>|([-*+]|\d+[.)])\s)/.test(lines[i])
+      && !(isTableRow(lines[i]) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1]))) para.push(lines[i++]);
+    if (!para.length) { para.push(lines[i++]); }
+    const p = el("p");
+    para.forEach((l, k) => { if (k) p.append(el("br")); p.append(inlineMd(l)); });
+    box.append(p);
+  }
+  return box;
+}
+/* Plain one-line preview of a Markdown reply (feed cards, history titles). */
+function plainText(text) {
+  return String(text || "").replace(/```[\s\S]*?```/g, " [kod] ").replace(/^\s*#{1,6}\s+/gm, "").replace(/^\s*>\s?/gm, "")
+    .replace(/^\s*([-*+]|\d+[.)])\s+/gm, "").replace(/\*\*|__|`/g, "").replace(/\*([^*\n]+)\*/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\s+/g, " ").trim();
+}
 /* Polish plural: 1 plik, 2–4 pliki, 5+ plików (12–14 always the "many" form). */
 function plural(n, one, few, many) {
   if (n === 1) return one;
@@ -504,13 +593,13 @@ async function loadToday() {
     const s = schedules.find((x) => x.last_pid === p.pid);
     const name = s.title || String(s.task).split("\n")[0].slice(0, 60);
     const ok = p.status === "completed";
-    const out = ok ? String((p.result && p.result.output) || "").replace(/\s+/g, " ").slice(0, 110) : "Dotknij, żeby zobaczyć, co poszło nie tak";
+    const out = ok ? plainText((p.result && p.result.output) || "").slice(0, 110) : "Dotknij, żeby zobaczyć, co poszło nie tak";
     items.push(todayItem(ok ? "check" : "alert", ok ? "soft" : "amber", `${name} – ${ok ? "gotowe" : "nie udało się"} · ${fmtTime(p.finished_at * 1000)}`,
       out, () => { markSeen(p.pid); showTab("tasks"); openTask(p.pid); }));
   }
   const convo = lastConversation();
   if (convo) {
-    items.push(todayItem("chat", "soft", `Kontynuuj rozmowę z ${convo.agent}`, convo.text.replace(/\s+/g, " ").slice(0, 110),
+    items.push(todayItem("chat", "soft", `Kontynuuj rozmowę z ${convo.agent}`, plainText(convo.text).slice(0, 110),
       () => { selectAgent(convo.agent); showTab("convo"); }));
   }
   const upcoming = schedules.filter((s) => s.enabled).map((s) => ({ s, d: nextRun(s.time, s.days) })).filter((x) => x.d).sort((a, b) => a.d - b.d)[0];
@@ -761,7 +850,7 @@ function renderAgentReply(node, proc) {
   node.classList.remove("thinking"); node.replaceChildren();
   if (proc.status === "failed") { node.append(...errorView(proc.error)); return; }
   const r = proc.result || {};
-  node.append(el("span", {}, richText(r.output || "(brak odpowiedzi)")));
+  node.append(markdown(r.output || "(brak odpowiedzi)"));
   const detail = el("div", { class: "tool-detail hidden" });
   if (r.tool_calls && r.tool_calls.length) detail.append(...r.tool_calls.map((c) => el("pre", { text: `${c.tool}(${JSON.stringify(c.arguments)})\n→ ${c.result}` })));
   if (r.reflection) detail.append(el("div", { class: "meta", text: `🔁 Samoocena: ${Math.round(r.reflection.best_score * 100)}% (próby: ${r.reflection.attempts.length})` }));
