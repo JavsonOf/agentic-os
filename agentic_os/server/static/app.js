@@ -29,6 +29,7 @@ function el(tag, attrs = {}, ...children) {
 }
 const ICONS = {
   robot: '<rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
@@ -48,6 +49,21 @@ function toast(msg, isErr = false) {
   const t = $("#toast");
   t.textContent = msg; t.classList.toggle("err", isErr); t.classList.add("show");
   clearTimeout(state.timers.toast); state.timers.toast = setTimeout(() => t.classList.remove("show"), 3400);
+}
+/* A short notice with a "Cofnij" button: changes are saved at once and can be taken back for 5 seconds. */
+function snackbar(msg, onUndo) {
+  const bar = $("#snackbar"); $("#snackbar-text").textContent = msg;
+  $("#snackbar-undo").onclick = () => { bar.classList.remove("show"); clearTimeout(state.timers.snack); onUndo(); };
+  bar.classList.add("show"); clearTimeout(state.timers.snack);
+  state.timers.snack = setTimeout(() => bar.classList.remove("show"), 5000);
+}
+/* Press and hold (or right-click / the context-menu key) runs fn; the click that ends a long press is ignored. */
+function onLongPress(node, fn) {
+  let timer = 0;
+  const cancel = () => clearTimeout(timer);
+  node.addEventListener("pointerdown", (e) => { if (e.button) return; node.longPressed = false; cancel(); timer = setTimeout(() => { node.longPressed = true; fn(); }, 500); });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) node.addEventListener(ev, cancel);
+  node.addEventListener("contextmenu", (e) => { e.preventDefault(); cancel(); if (!node.longPressed) { node.longPressed = e.pointerType === "touch"; fn(); } });
 }
 /* explainError() lives in errors.js: one place that turns every known error into plain Polish. */
 function errorView(msg) {
@@ -249,11 +265,54 @@ async function useConnectLink(text) {
 }
 $("#login-qr").addEventListener("click", () => {
   if (!("BarcodeDetector" in window)) {
-    $("#login-error").textContent = "Ta przeglądarka nie czyta kodów QR. Zeskanuj kod aparatem telefonu: link sam otworzy War Room.";
+    $("#login-error").textContent = isApp() ? "Ten telefon nie czyta kodów QR w aplikacji. Wpisz adres i hasło ręcznie."
+      : "Ta przeglądarka nie czyta kodów QR. Zeskanuj kod aparatem telefonu: link sam otworzy War Room.";
     return;
   }
-  $("#login-qr-file").click();
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) scanQrLive();
+  else $("#login-qr-file").click();
 });
+/* Live scanner: camera preview that reads the code by itself; "Zrób zdjęcie" is the fallback. */
+async function scanQrLive() {
+  let stream = null; let stopped = false;
+  const video = el("video", { class: "qr-video", playsinline: true, autoplay: true, muted: true });
+  video.muted = true;
+  const stop = () => {
+    stopped = true; if (stream) stream.getTracks().forEach((t) => t.stop());
+    overlay.remove(); document.removeEventListener("keydown", onKey); $("#login-qr").focus();
+  };
+  const onKey = (e) => { if (e.key === "Escape") stop(); };
+  const overlay = el("div", { class: "qr-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Skanowanie kodu QR" },
+    el("div", { class: "qr-frame" }, video, el("span", { class: "qr-aim", "aria-hidden": "true" })),
+    el("p", { class: "qr-status", text: "Nakieruj aparat na kod QR z komputera (Ty → Połącz telefon)." }),
+    el("div", { class: "qr-actions" },
+      el("button", { type: "button", class: "btn ghost", text: "Zrób zdjęcie", onclick: () => { stop(); $("#login-qr-file").click(); } }),
+      el("button", { type: "button", class: "btn primary", text: "Anuluj", onclick: stop })));
+  document.body.append(overlay); document.addEventListener("keydown", onKey);
+  $(".qr-actions .primary", overlay).focus();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+  } catch (err) {
+    if (stopped) return;
+    stop();
+    $("#login-error").textContent = err && err.name === "NotAllowedError"
+      ? "Brak dostępu do aparatu. Zezwól na aparat albo zrób zdjęcie kodu." : "Nie mogę włączyć aparatu. Spróbuj zrobić zdjęcie kodu.";
+    return;
+  }
+  if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
+  video.srcObject = stream;
+  const detector = new BarcodeDetector({ formats: ["qr_code"] });
+  while (!stopped) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (stopped || video.readyState < 2) continue;
+    let codes = [];
+    try { codes = await detector.detect(video); } catch { continue; }
+    if (!codes.length) continue;
+    stop();
+    try { await useConnectLink(codes[0].rawValue); } catch (err) { $("#login-error").textContent = err.message; }
+    return;
+  }
+}
 $("#login-qr-file").addEventListener("change", async (e) => {
   const file = e.target.files[0]; e.target.value = "";
   if (!file) return;
@@ -296,10 +355,11 @@ function redrawBrain() { if (state.tab === "brain" && brain.nodes.length) simula
 
 /* ------------------------------------------------------------------- tabs */
 /* Five tabs in the bottom bar; the other screens open from them and keep their tab lit. */
-const TAB_PARENT = { agents: "me", ext: "me", monitor: "me", brain: "knowledge", convo: "chat" };
+const TAB_PARENT = { agents: "me", agent: "me", ext: "me", monitor: "me", brain: "knowledge", convo: "chat" };
 const LOADERS = {
   chat: () => loadStart(), convo: () => openConvo(), agents: () => loadAgents(), tasks: () => loadTasks(), brain: () => loadBrain(),
   knowledge: () => loadKnowledge(), ext: () => loadExt(), models: () => loadModels(), monitor: () => loadMonitor(), me: () => loadMe(),
+  agent: () => loadAgentScreen(),
 };
 function showTab(name) {
   if (!document.getElementById("tab-" + name)) name = "chat";
@@ -407,9 +467,22 @@ document.querySelectorAll("[data-quick]").forEach((b) => b.addEventListener("cli
 $("#offline-fix").addEventListener("click", () => showTab("models"));
 /* Voice input (Web Speech API); the mic button only appears where the browser supports it. */
 (function setupMic() {
+  const btn = $("#start-mic");
+  if (isApp()) {
+    // The app's WebView has no speech recognition of its own: the app opens the phone's speech screen instead.
+    const bridge = window.AgenticOSAndroid;
+    if (!bridge || !bridge.canListen || !bridge.canListen()) return;
+    btn.classList.remove("hidden");
+    btn.addEventListener("click", () => {
+      const base = $("#start-text").value ? $("#start-text").value + " " : "";
+      window.aosSpeechResult = (text) => { window.aosSpeechResult = null; if (text) { $("#start-text").value = base + text; $("#start-text").focus(); } };
+      bridge.listen("pl-PL");
+    });
+    return;
+  }
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) return;
-  const btn = $("#start-mic"); btn.classList.remove("hidden");
+  btn.classList.remove("hidden");
   let rec = null;
   btn.addEventListener("click", () => {
     if (rec) { rec.stop(); return; }
@@ -508,6 +581,7 @@ function chatKey(agent) { return `aos_chat_${agent}_${sessionId(agent)}`; }
 function loadChat(agent) { try { return JSON.parse(store.get(chatKey(agent), "[]")) || []; } catch { return []; } }
 function saveChat(agent, entries) {
   let keep = entries.slice(-CHAT_KEEP);
+  if (!keep.length) { store.del(chatKey(agent)); return; }
   // Drop the oldest messages when the browser storage is full.
   while (keep.length) { store.set(chatKey(agent), JSON.stringify(keep)); if (store.get(chatKey(agent)) === JSON.stringify(keep)) return; keep = keep.slice(Math.ceil(keep.length / 4)); }
 }
@@ -547,7 +621,7 @@ function renderChat() {
   let lastDay = null;
   for (const e of entries) {
     if (e.at && (lastDay === null || dayDiff(e.at) !== lastDay)) { lastDay = dayDiff(e.at); chatLog.append(el("span", { class: "day-sep", text: dayLabel(e.at) })); }
-    if (e.role === "user") { addMsg("user", e.text); continue; }
+    if (e.role === "user") { userMsg(e); continue; }
     if (e.role === "note") { addMsg("note", e.text); continue; }
     const node = addMsg("agent thinking", e.pid ? "Myślę…" : "⚠️ " + (e.error || "Błąd"));
     if (e.done) renderAgentReply(node, e.done);
@@ -557,13 +631,59 @@ function renderChat() {
   renderApprovals(state.approvals || [], true);
   chatLog.scrollTop = chatLog.scrollHeight;
 }
+/* Editing a sent message works like in other AI chats: the answers after it are forgotten and the new text is sent instead. */
+function userMsg(entry) {
+  const bubble = addMsg("user", entry.text);
+  if (!entry.at) return bubble;
+  const edit = el("button", { type: "button", class: "msg-edit", "aria-label": "Edytuj wiadomość", title: "Edytuj wiadomość",
+    onclick: () => editMessage(entry.at, bubble, edit) }, icon("pen", 15));
+  bubble.after(edit);
+  return bubble;
+}
+function replyPending(entries) { return entries.some((e) => e.role === "agent" && e.pid && !e.done); }
+function editMessage(at, bubble, button) {
+  const agent = currentAgent();
+  if (replyPending(loadChat(agent))) { toast("Poczekaj, aż agent skończy odpowiadać."); return; }
+  const original = loadChat(agent).find((e) => e.role === "user" && e.at === at);
+  if (!original) return;
+  const ta = el("textarea", { rows: "3", "aria-label": "Popraw wiadomość" }); ta.value = original.text;
+  const send = el("button", { type: "submit", class: "btn primary small", text: "Wyślij" });
+  const close = () => { form.remove(); bubble.classList.remove("hidden"); button.classList.remove("hidden"); button.focus(); };
+  const form = el("form", { class: "msg-editor" }, ta, el("div", { class: "msg-editor-row" },
+    el("span", { class: "muted small", text: "Odpowiedzi po tej wiadomości zostaną zastąpione." }),
+    el("button", { type: "button", class: "btn ghost small", text: "Anuluj", onclick: close }), send));
+  ta.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.innerWidth > 900) { e.preventDefault(); form.requestSubmit(); }
+  });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = ta.value.trim(); if (!text) { ta.focus(); return; }
+    const entries = loadChat(agent);
+    const idx = entries.findIndex((x) => x.role === "user" && x.at === at);
+    if (idx < 0) { close(); return; }
+    if (replyPending(entries)) { toast("Poczekaj, aż agent skończy odpowiadać."); return; }
+    // The server remembers one exchange per finished answer; forget those from this message on.
+    const turns = entries.slice(idx).filter((x) => x.role === "agent" && x.done && x.done.status === "completed").length;
+    send.disabled = true;
+    try { await api("/chat/rewind", { method: "POST", body: { agent, session: sessionId(agent), turns } }); }
+    catch (err) { send.disabled = false; toast(err.message, true); return; }
+    saveChat(agent, entries.slice(0, idx));
+    renderChat();
+    sendMessage(text);
+  });
+  bubble.classList.add("hidden"); button.classList.add("hidden");
+  button.after(form);
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+}
 async function sendMessage(text) {
   const agent = currentAgent();
   const entries = loadChat(agent);
   const last = entries.filter((e) => e.at).pop();
   if (!last || dayDiff(last.at) !== 0 || Date.now() - last.at > 30 * 60 * 1000) { $(".empty", chatLog)?.remove(); insertBeforeAsks(el("span", { class: "day-sep", text: dayLabel(Date.now()) })); }
-  addMsg("user", text);
-  updateChat(agent, (list) => list.push({ role: "user", text, at: Date.now() }));
+  const entry = { role: "user", text, at: Date.now() };
+  userMsg(entry);
+  updateChat(agent, (list) => list.push(entry));
   const reply = addMsg("agent thinking", "Myślę…");
   let proc;
   try {
@@ -733,6 +853,7 @@ async function loadAgents() {
     a.learning ? el("p", { class: "small", text: "📈 " + Object.entries(a.learning.strategies).map(([k, v]) => `${STRATEGIES[k] || k}: ${v.pulls ? `${v.mean_reward > 0 ? "+" : ""}${v.mean_reward} (${v.pulls}×)` : "–"}`).join(" · ") + (a.learning.best ? ` → najlepszy: ${STRATEGIES[a.learning.best] || a.learning.best}` : "") }) : null,
     el("div", { class: "actions" },
       el("button", { class: "btn small", type: "button", text: "💬 Czat", onclick: () => { selectAgent(a.name); showTab("convo"); } }),
+      a.kind !== "external" ? el("button", { class: "btn small ghost", type: "button", text: "✏️ Edytuj", onclick: () => openAgentScreen(a.name) }) : null,
       a.name !== "assistant" ? el("button", { class: "btn small ghost danger", type: "button", text: "Usuń", onclick: async () => {
         if (!confirm(`Usunąć agenta ${a.name}?`)) return;
         try { await api(`/agents/${a.name}`, { method: "DELETE" }); toast("Usunięto"); loadAgents(); } catch (err) { toast(err.message, true); }
@@ -746,6 +867,69 @@ async function loadAgents() {
   if (!ext.options.length) {
     ext.replaceChildren(el("option", { value: "", text: "— wybierz —" }), ...state.extPresets.map((p, i) => el("option", { value: String(i), text: p.label })));
   }
+}
+/* ------------------------------------------- agent screen (Edytuj agenta) */
+function openAgentScreen(name) {
+  store.set("aos_edit_agent", name);
+  showTab("agent");
+}
+async function loadAgentScreen() {
+  const name = store.get("aos_edit_agent", "assistant");
+  let skills = [];
+  try { [, , { skills }] = await Promise.all([refreshAgents(), refreshProviders(), api("/skills")]); } catch (err) { toast(err.message, true); return; }
+  const a = state.agents.find((x) => x.name === name);
+  if (!a || a.kind === "external") { showTab("agents"); return; }
+  const index = state.agents.indexOf(a);
+  const p = state.providers.find((x) => x.id === a.provider);
+  $("#agent-screen-tile").className = "tile agent-head-tile " + (index % 2 ? "amber" : "soft");
+  $("#agent-screen-tile").replaceChildren(icon(index % 2 ? "pen" : "robot", 24));
+  $("#agent-screen-name").textContent = a.name;
+  $("#agent-screen-sub").textContent = "Agent · " + (a.model || (p ? providerName(p) : "model domyślny"));
+  const chosen = new Set(a.skills || []);
+  // Every tap is saved at once (in order); "Cofnij" in the notice takes it back.
+  let saving = Promise.resolve();
+  const save = () => {
+    const keep = skills.map((s) => s.name).filter((n) => chosen.has(n));
+    saving = saving.catch(() => {}).then(() => api(`/agents/${a.name}/settings`, { method: "POST", body: { skills: keep } }));
+    return saving;
+  };
+  const paint = (btn, s) => {
+    const on = chosen.has(s.name);
+    btn.setAttribute("aria-pressed", String(on));
+    btn.replaceChildren(...(on ? [icon("check", 14)] : []), s.name);
+  };
+  const toggle = async (s, btn, undoing = false) => {
+    const now = !chosen.has(s.name);
+    if (now) chosen.add(s.name); else chosen.delete(s.name);
+    paint(btn, s);
+    try { await save(); } catch (err) {
+      if (now) chosen.delete(s.name); else chosen.add(s.name);
+      paint(btn, s); toast(err.message, true); return;
+    }
+    if (undoing) toast("Cofnięto");
+    else snackbar(`${now ? "Włączono" : "Wyłączono"}: ${s.name}`, () => toggle(s, btn, true));
+  };
+  const info = (s, btn) => {
+    const on = chosen.has(s.name);
+    const text = (s.instructions || "").trim();
+    openSheet(s.name,
+      el("p", { text: s.description || "Brak opisu." }),
+      s.tools && s.tools.length ? el("p", { class: "small" }, el("b", { text: "Narzędzia: " }), s.tools.join(", ")) : null,
+      text ? el("details", {}, el("summary", { text: "Instrukcje dla agenta" }), el("pre", { class: "out", text: text.length > 1200 ? text.slice(0, 1200) + "…" : text })) : null,
+      el("button", { type: "button", class: "btn primary btn-wide", text: on ? "Wyłącz dla tego agenta" : "Włącz dla tego agenta",
+        onclick: () => { closeSheet(); toggle(s, btn); btn.focus(); } }));
+  };
+  const chip = (s) => {
+    const btn = el("button", { type: "button", class: "skill-chip", "aria-pressed": "false",
+      "aria-description": "Przytrzymaj, żeby zobaczyć opis",
+      onclick: () => { if (btn.longPressed) { btn.longPressed = false; return; } toggle(s, btn); } });
+    paint(btn, s);
+    onLongPress(btn, () => info(s, btn));
+    return btn;
+  };
+  $("#agent-screen-skills").replaceChildren(...(skills.length ? skills.map(chip)
+    : [el("span", { class: "muted small", text: "Brak skilli. Dodaj je w Ty → Rozszerzenia albo w Ty → Agenci → Gotowy zespół." })]));
+  $("#agent-screen-hint").classList.toggle("hidden", !skills.length);
 }
 function agentTraits(a) {
   if (a.kind === "external") return null;
@@ -881,9 +1065,33 @@ function editSchedule(s) {
   E.time.value = s ? s.time : "07:30"; E.days.value = s ? s.days : "daily"; E.agent.value = s ? s.agent : currentAgent();
   $("#schedule-form-title").textContent = s ? "Zaplanowane zadanie" : "Nowe zaplanowane zadanie";
   $("#schedule-run").classList.toggle("hidden", !s); $("#schedule-delete").classList.toggle("hidden", !s);
+  showNextRun();
   f.classList.remove("hidden");
   setTimeout(() => { f.scrollIntoView({ behavior: "smooth", block: "start" }); E.title.focus(); }, 30);
 }
+/* "Następne uruchomienie: jutro o 07:30" – the same rule as the server: a time that already passed today starts tomorrow. */
+function nextRun(time, days, now = new Date()) {
+  const [h, m] = String(time || "").split(":").map(Number);
+  if (!Number.isFinite(h)) return null;
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, h, m || 0);
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    if (d <= now || (days === "weekdays" && weekend) || (days === "weekends" && !weekend)) continue;
+    return d;
+  }
+  return null;
+}
+function showNextRun() {
+  const E = $("#schedule-form").elements; const out = $("#schedule-next");
+  const d = nextRun(E.time.value, E.days.value);
+  if (!d) { out.textContent = ""; return; }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const inDays = Math.round((new Date(d).setHours(0, 0, 0, 0) - today) / 864e5);
+  const day = inDays === 0 ? "dziś" : inDays === 1 ? "jutro" : d.toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long" });
+  out.textContent = `⏰ Następne uruchomienie: ${day} o ${E.time.value}`;
+}
+$("#schedule-form").elements.time.addEventListener("input", showNextRun);
+$("#schedule-form").elements.days.addEventListener("change", showNextRun);
 $("#schedule-new").addEventListener("click", () => editSchedule(null));
 $("#schedule-cancel").addEventListener("click", () => $("#schedule-form").classList.add("hidden"));
 $("#schedule-form").addEventListener("submit", withBusy($("#schedule-form"), async (fd) => {
@@ -1052,7 +1260,31 @@ $("#kb-form").addEventListener("submit", withBusy($("#kb-form"), async (fd) => {
 
 /* ----------------------------------------------------------- models (C4) */
 const POPULAR = ["gemini", "anthropic", "openrouter", "openai"];
+/* Modele → Zużycie: how many tokens and requests went to each provider (Dziś / 7 dni / Miesiąc). */
+const fmtNum = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(".", ",") + " mln" : n >= 1e4 ? Math.round(n / 1e3) + " tys." : String(n);
+async function loadUsage(period = store.get("aos_usage_period", "week")) {
+  store.set("aos_usage_period", period);
+  document.querySelectorAll("#usage-periods button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.period === period)));
+  let u;
+  try { u = await api(`/usage?period=${period}`); } catch (err) { toast(err.message, true); return; }
+  const total = u.input + u.output;
+  $("#usage-tokens").textContent = fmtNum(total);
+  $("#usage-sub").textContent = `${plural(total, "token", "tokeny", "tokenów")} · ${u.calls} ${plural(u.calls, "zapytanie", "zapytania", "zapytań")}`;
+  $("#usage-in").textContent = "wejście " + fmtNum(u.input);
+  $("#usage-out").textContent = "wyjście " + fmtNum(u.output);
+  const max = Math.max(1, ...u.days.map((d) => d.input + d.output));
+  $("#usage-bars").classList.toggle("hidden", u.days.length < 2);
+  $("#usage-bars").replaceChildren(...u.days.map((d, i) => el("div", { class: "bar" + (i === u.days.length - 1 ? " today" : ""),
+    title: `${d.date}: ${fmtNum(d.input + d.output)} tokenów, ${d.calls} zapytań`,
+    style: `height:${Math.max(3, Math.round((d.input + d.output) / max * 86))}px` })));
+  $("#usage-providers").replaceChildren(...(u.providers.length ? u.providers.map((p) => el("div", { class: "usage-prov" },
+    el("span", { class: "dot" }),
+    el("div", { class: "name" }, el("b", { text: p.label }), el("span", { text: `${p.calls} ${plural(p.calls, "zapytanie", "zapytania", "zapytań")}` })),
+    el("b", { text: fmtNum(p.input + p.output) }))) : [el("p", { class: "muted small", text: "Brak zapytań w tym okresie." })]));
+}
+document.querySelectorAll("#usage-periods button").forEach((b) => b.addEventListener("click", () => loadUsage(b.dataset.period)));
 async function loadModels() {
+  loadUsage();
   let data;
   try { data = await refreshProviders(); } catch (err) { toast(err.message, true); return; }
   const def = data.default;
@@ -1162,8 +1394,22 @@ function fillProviderForm(p, isPreset = false) {
   E.daily_limit.value = !isPreset && p.daily_limit ? p.daily_limit : "";
   E.api_key.value = ""; E.api_key.placeholder = !isPreset && p.has_key ? "zostaw puste, żeby nie zmieniać" : "wklej klucz API";
   E.make_default.checked = isPreset && !state.providers.length;
+  f.dataset.savedUrl = !isPreset && p.has_key ? (p.base_url || "") : "";
+  f.dataset.hasKey = String(!isPreset && !!p.has_key);
+  keyHint();
   openDetails("provider-form-card");
 }
+/* The server forgets a saved key when the provider address changes (so a key never leaks to a new address): ask for it right away. */
+function keyHint() {
+  const f = $("#provider-form"); const E = f.elements;
+  const need = f.dataset.hasKey === "true" && E.base_url.value.trim() !== f.dataset.savedUrl;
+  E.api_key.required = need; E.api_key.classList.toggle("need", need);
+  E.api_key.placeholder = need ? "wpisz klucz ponownie" : f.dataset.hasKey === "true" ? "zostaw puste, żeby nie zmieniać" : "wklej klucz API";
+  $("#provider-key-hint").classList.toggle("hidden", !need);
+}
+$("#provider-form").elements.base_url.addEventListener("input", keyHint);
+/* With gesture navigation there is no long press of Back, so the app's address dialog opens from Ty. */
+$("#me-address").addEventListener("click", () => { location.href = "agentic-os://settings"; });
 $("#provider-add").addEventListener("click", () => fillProviderForm(state.presets[0] || { id: "", kind: "openai_compat" }, true));
 $("#provider-preset").addEventListener("change", (e) => fillProviderForm(state.presets[Number(e.target.value)], true));
 $("#provider-form").addEventListener("submit", withBusy($("#provider-form"), async (fd) => {
@@ -1184,6 +1430,8 @@ function serverLabel() {
 }
 function loadMe() {
   $("#me-server").textContent = `Połączono z serwerem · ${serverLabel()}`;
+  $("#me-address").classList.toggle("hidden", !isApp());
+  $("#me-address-value").textContent = location.host;
   const a = agentInfo();
   const native = a.kind !== "external";
   $("#me-permission-value").textContent = native ? PERM_SHORT[a.permission] || "Autonomiczny" : "zewnętrzny";

@@ -203,6 +203,23 @@
         </details>
       </section>
 
+      <!-- AGENT: ekran jednego agenta -->
+      <section id="tab-agent" class="panel">
+        <button class="back-btn" type="button" data-go="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Agenci</span></button>
+        <div class="agent-head">
+          <span class="tile soft agent-head-tile" id="agent-screen-tile"></span>
+          <div class="agent-head-text">
+            <h2 id="agent-screen-name">agent</h2>
+            <span class="muted" id="agent-screen-sub"></span>
+          </div>
+        </div>
+        <section class="card stack" aria-labelledby="agent-screen-skills-title">
+          <h3 id="agent-screen-skills-title" class="card-title">Skille</h3>
+          <div id="agent-screen-skills" class="chips" role="group" aria-labelledby="agent-screen-skills-title"></div>
+          <p class="muted small" id="agent-screen-hint">Dotknij skilla, żeby go włączyć albo wyłączyć – zapisuje się od razu. Przytrzymaj, żeby zobaczyć, co robi.</p>
+        </section>
+      </section>
+
 
       <!-- ZADANIA -->
       <section id="tab-tasks" class="panel">
@@ -226,6 +243,7 @@
               <select name="days"><option value="daily">Codziennie</option><option value="weekdays">W dni robocze</option><option value="weekends">W weekendy</option></select>
             </label>
           </div>
+          <p class="muted small" id="schedule-next" aria-live="polite"></p>
           <label class="field"><span>Agent</span><select name="agent" id="schedule-agent"></select></label>
           <div class="row">
             <button class="btn primary" type="submit">Zapisz</button>
@@ -367,6 +385,20 @@
           <button id="provider-add" class="head-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Dostawca</button>
         </header>
         <div id="provider-cards" class="provider-cards"></div>
+        <section class="card usage-card" aria-labelledby="usage-title">
+          <div class="usage-head">
+            <h3 id="usage-title" class="card-title">Zużycie</h3>
+            <div class="seg" role="tablist" aria-label="Okres" id="usage-periods">
+              <button type="button" role="tab" data-period="today" aria-selected="false">Dziś</button>
+              <button type="button" role="tab" data-period="week" aria-selected="true">7 dni</button>
+              <button type="button" role="tab" data-period="month" aria-selected="false">Miesiąc</button>
+            </div>
+          </div>
+          <div class="usage-total"><strong id="usage-tokens">0</strong><span class="muted" id="usage-sub">tokenów · 0 zapytań</span></div>
+          <div class="chips"><span class="pill-soft" id="usage-in">wejście 0</span><span class="pill-soft" id="usage-out">wyjście 0</span></div>
+          <div class="usage-bars" id="usage-bars" role="img" aria-label="Tokeny dzień po dniu"></div>
+          <div class="usage-providers" id="usage-providers"></div>
+        </section>
         <details class="card form-card" id="provider-form-card">
           <summary>Dostawca i klucz API</summary>
           <form id="provider-form" class="stack">
@@ -379,6 +411,7 @@
             </div>
             <label class="field"><span>Adres API (base URL)</span><input name="base_url" placeholder="https://…/v1"></label>
             <label class="field"><span>Klucz API</span><input name="api_key" type="password" autocomplete="off" placeholder="zostaw puste, żeby nie zmieniać"></label>
+            <p class="key-hint small hidden" id="provider-key-hint">Zmieniasz adres API – wpisz klucz jeszcze raz. Zapisany klucz nie zostanie wysłany pod nowy adres.</p>
             <label class="field"><span>Domyślny model</span><input name="default_model" placeholder="np. gemini-flash-latest"></label>
             <label class="field"><span>Dzienny limit zapytań (opcjonalnie, np. 20 na darmowym planie)</span><input name="daily_limit" type="number" min="0" step="1" inputmode="numeric" placeholder="brak"></label>
             <label class="check"><input type="checkbox" name="make_default"> Ustaw jako domyślny model systemu</label>
@@ -424,6 +457,11 @@
           <button class="menu-item" type="button" id="me-mode">
             <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span>
             <span class="menu-text"><b>Tryb myślenia</b><small>Jak agent układa odpowiedzi · <span id="me-mode-value"></span></small></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button class="menu-item hidden" type="button" id="me-address">
+            <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="6" rx="2"/><rect x="4" y="13" width="16" height="6" rx="2"/><path d="M8 8h.01M8 16h.01"/></svg></span>
+            <span class="menu-text"><b>Adres serwera</b><small>Zmień serwer, z którym łączy się aplikacja · <span id="me-address-value"></span></small></span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
           </button>
           <button class="menu-item" type="button" data-go="agents">
@@ -484,6 +522,7 @@
       </div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="snackbar" class="snackbar" role="status" aria-live="polite"><span id="snackbar-text"></span><button type="button" id="snackbar-undo">Cofnij</button></div>
   </div>
   <script src="/errors.js"></script>
   <script src="/qr.js"></script>

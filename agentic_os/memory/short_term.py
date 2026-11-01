@@ -46,5 +46,11 @@ class ConversationBuffer:
     def clear(self) -> None:
         self._turns.clear()
 
+    def rewind(self, turns: int) -> int:
+        """Forget the last ``turns`` exchanges (e.g. to edit an earlier message). Returns how many were removed."""
+        removed = min(max(0, turns), len(self._turns))
+        del self._turns[len(self._turns) - removed:]
+        return removed
+
     def __len__(self) -> int:
         return len(self._turns)

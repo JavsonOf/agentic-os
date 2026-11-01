@@ -46,7 +46,37 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Reliability Fixes: Safe Saving, Planner, Schedules and Models
+Tytuł: Message Editing, Agent Screen and Token Usage Counter
+
+### Dodano
+- Edycja wysłanej wiadomości w czacie, jak w innych aplikacjach AI.
+  - Pod każdą Twoją wiadomością jest ołówek „Edytuj”: poprawiasz tekst i wysyłasz go jeszcze raz.
+  - Odpowiedzi po tej wiadomości znikają z ekranu i z pamięci agenta, więc agent odpowiada tak, jakby poprzedniej wersji nie było.
+  - Edycja czeka, aż agent skończy odpowiadać. Esc albo „Anuluj” zostawia wiadomość bez zmian.
+- Ekran agenta: w Ty → Agenci przy każdym agencie jest przycisk „✏️ Edytuj”.
+  - U góry ikona agenta, jego nazwa i model, z którego korzysta.
+  - Karta „Skille” pokazuje wszystkie dostępne skille jako kafelki: dotknięcie włącza albo wyłącza skill (włączony jest zielony, z ptaszkiem).
+  - Każde dotknięcie zapisuje się od razu, bez przycisku „Zapisz”. Na dole pojawia się na 5 sekund „Włączono: …” z przyciskiem „Cofnij”.
+  - Przytrzymanie kafelka (albo prawy przycisk myszy) pokazuje opis skilla, jego narzędzia i instrukcje, z przyciskiem włącz/wyłącz.
+  - Uprawnienia, tryb myślenia, rozmowy i zgody agenta zostają bez zmian.
+- Licznik zużycia w zakładce Modele: ile poszło tokenów i ile było zapytań, bez kwot.
+  - Przełącznik okresu: Dziś, 7 dni, Miesiąc.
+  - Suma tokenów z podziałem na wejście i wyjście oraz wykres dzień po dniu.
+  - Lista dostawców z liczbą zapytań i tokenów każdego z nich.
+  - Liczenie zaczyna się od tej wersji: wcześniejsze dni pokazują 0.
+
+### Naprawiono
+- Aplikacja na Androida: aparat, mikrofon i zmiana adresu serwera działają na nowych telefonach.
+  - „Skanuj kod QR z komputera” włącza aparat na żywo i sam odczytuje kod. Aplikacja pyta o dostęp do aparatu przy pierwszym użyciu. Przycisk „Zrób zdjęcie” zostaje jako zapas.
+  - Przycisk mikrofonu otwiera systemowe rozpoznawanie mowy telefonu, a rozpoznany tekst trafia do pola wiadomości. Aplikacja nie potrzebuje do tego dostępu do mikrofonu.
+  - Adres serwera zmienisz w zakładce Ty → Adres serwera. Działa też przy nawigacji gestami, gdzie nie da się przytrzymać przycisku Wstecz.
+
+### Ulepszono
+- Formularz zaplanowanego zadania pokazuje, kiedy zadanie uruchomi się pierwszy raz, np. „Następne uruchomienie: jutro o 07:30”.
+- Gdy zmieniasz adres API dostawcy z zapisanym kluczem, pole klucza od razu prosi o wpisanie go ponownie (zapisany klucz nie jest wysyłany pod nowy adres).
+
+## v0.4.2 – Reliability Fixes: Safe Saving, Planner, Schedules and Models
+_01.11.2026_
 
 ### Naprawiono
 - Ustawienia, agenci, skille, mody, harmonogram i pamięć zapisują się bezpiecznie: awaria w trakcie zapisu nie zostawia już uszkodzonego pliku.

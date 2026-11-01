@@ -180,3 +180,78 @@ def test_a_run_cut_at_the_step_limit_ends_with_an_assistant_message():
     agent = Agent("a", llm=ScriptedLLM(looping), tools=[calc], max_steps=2)
     result = agent.run("policz")
     assert result.stopped_reason == "max_steps" and result.messages[-1].role == "assistant"
+
+
+def test_usage_counts_requests_and_tokens_per_day_and_provider(tmp_path, monkeypatch):
+    import urllib.request as ur
+
+    from agentic_os.llm import LLMResponse
+    from agentic_os.providers import ProviderRegistry
+
+    monkeypatch.setattr(OpenAICompatProvider, "complete",
+                        lambda self, *a, **k: LLMResponse(text="ok", usage={"input_tokens": 120, "output_tokens": 30}))
+    reg = ProviderRegistry(path=str(tmp_path / "providers.json"))
+    reg.upsert(ProviderConfig("g", "openai_compat", api_key="k", base_url="https://api.example/v1",
+                              default_model="m", label="Gemini"))
+    assert reg.build("g").complete([]).text == "ok"  # the counting wrapper passes the reply through
+    reg.record_call("g", {"input_tokens": 5, "output_tokens": 5})
+    week = reg.history(7)
+    assert week["calls"] == 2 and week["input"] == 125 and week["output"] == 35
+    assert len(week["days"]) == 7 and week["days"][-1]["calls"] == 2
+    assert week["providers"] == [{"id": "g", "calls": 2, "input": 125, "output": 35, "label": "Gemini"}]
+    again = ProviderRegistry(path=str(tmp_path / "providers.json"))  # persisted
+    assert again.history(1)["input"] == 125
+
+    system = AgenticOS(Settings(provider="mock"))
+    httpd = make_server(system, port=0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    try:
+        with ur.urlopen(base + "/usage?period=month", timeout=10) as resp:
+            data = json.loads(resp.read())
+        assert data["period"] == "month" and len(data["days"]) == 30
+        with pytest.raises(urllib.error.HTTPError):
+            ur.urlopen(base + "/usage?period=year", timeout=10)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        system.shutdown()
+
+
+def test_editing_a_message_forgets_the_later_exchanges():
+    from agentic_os.llm.base import Message
+    from agentic_os.memory.short_term import ConversationBuffer
+
+    buffer = ConversationBuffer()
+    for n in range(3):
+        buffer.add_turn([Message.user(f"pytanie {n}"), Message.assistant(f"odpowiedź {n}")])
+    assert buffer.rewind(2) == 2 and [m.content for m in buffer.messages()] == ["pytanie 0", "odpowiedź 0"]
+    assert buffer.rewind(5) == 1 and buffer.messages() == [] and buffer.rewind(1) == 0
+
+    system = AgenticOS(Settings(provider="mock"))
+    system.chat("pierwsze", session="s1")
+    system.chat("drugie", session="s1")
+    httpd = make_server(system, port=0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+    def rewind(body):
+        req = urllib.request.Request(base + "/chat/rewind", data=json.dumps(body).encode(), method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as err:
+            return err.code, None
+
+    try:
+        assert rewind({"agent": "assistant", "session": "s1", "turns": 1}) == (200, {"removed": 1})
+        left = system._sessions[("assistant", "s1")].messages()
+        assert left[0].content == "pierwsze" and all("drugie" not in m.content for m in left)
+        assert rewind({"session": "nobody", "turns": 3}) == (200, {"removed": 0})
+        for bad in (-1, True, "2", None):
+            assert rewind({"session": "s1", "turns": bad})[0] == 400
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        system.shutdown()

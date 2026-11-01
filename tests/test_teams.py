@@ -68,3 +68,23 @@ def test_teams_http_api():
         httpd.shutdown()
         httpd.server_close()
         system.shutdown()
+
+
+def test_agent_screen_saves_the_chosen_skills():
+    system = AgenticOS(Settings(provider="mock", api_key="secret"))
+    httpd = make_server(system, port=0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+    try:
+        teams.install_team(system, "programista")
+        status, agent = _request(base, "POST", "/agents/programista/settings", {"skills": ["superpowers", "docs-fetcher"]}, "secret")
+        assert status == 200 and agent["skills"] == ["superpowers", "docs-fetcher"]
+        assert system.describe("programista")["permission"] == agent["permission"]  # other settings are kept
+        assert _request(base, "POST", "/agents/programista/settings", {"skills": ["ghost"]}, "secret")[0] == 400
+        assert _request(base, "POST", "/agents/programista/settings", {"skills": "superpowers"}, "secret")[0] == 400
+        status, agent = _request(base, "POST", "/agents/programista/settings", {"skills": []}, "secret")
+        assert status == 200 and agent["skills"] == []
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        system.shutdown()
