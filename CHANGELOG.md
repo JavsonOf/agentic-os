@@ -65,6 +65,12 @@ Tytuł: Message Editing, Agent Screen and Token Usage Counter
   - Lista dostawców z liczbą zapytań i tokenów każdego z nich.
   - Liczenie zaczyna się od tej wersji: wcześniejsze dni pokazują 0.
 
+### Naprawiono
+- Aplikacja na Androida: aparat, mikrofon i zmiana adresu serwera działają na nowych telefonach.
+  - „Skanuj kod QR z komputera” włącza aparat na żywo i sam odczytuje kod. Aplikacja pyta o dostęp do aparatu przy pierwszym użyciu. Przycisk „Zrób zdjęcie” zostaje jako zapas.
+  - Przycisk mikrofonu otwiera systemowe rozpoznawanie mowy telefonu, a rozpoznany tekst trafia do pola wiadomości. Aplikacja nie potrzebuje do tego dostępu do mikrofonu.
+  - Adres serwera zmienisz w zakładce Ty → Adres serwera. Działa też przy nawigacji gestami, gdzie nie da się przytrzymać przycisku Wstecz.
+
 ### Ulepszono
 - Formularz zaplanowanego zadania pokazuje, kiedy zadanie uruchomi się pierwszy raz, np. „Następne uruchomienie: jutro o 07:30”.
 - Gdy zmieniasz adres API dostawcy z zapisanym kluczem, pole klucza od razu prosi o wpisanie go ponownie (zapisany klucz nie jest wysyłany pod nowy adres).

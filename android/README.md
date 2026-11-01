@@ -19,7 +19,9 @@ Nowe wersje instalujesz tak samo, na wierzch starej. Ustawienia i logowanie zost
 ## Obsługa
 
 - **Wstecz:** cofa się w War Room. Na pierwszym ekranie zamyka aplikację.
-- **Przytrzymaj Wstecz:** zmiana adresu serwera.
+- **Zmiana adresu serwera:** zakładka **Ty → Adres serwera** (działa też przy nawigacji gestami). Z klasycznymi przyciskami możesz też przytrzymać Wstecz.
+- **Kod QR:** „Skanuj kod QR z komputera” włącza aparat na żywo (aplikacja pyta o dostęp do aparatu przy pierwszym użyciu).
+- **Mikrofon:** przycisk mikrofonu otwiera systemowe rozpoznawanie mowy telefonu, a tekst trafia do pola wiadomości.
 - **Brak połączenia:** pojawi się ekran z przyciskami „Spróbuj ponownie” i „Zmień adres serwera”.
 - Linki do innych stron otwierają się w przeglądarce.
 

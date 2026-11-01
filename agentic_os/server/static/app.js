@@ -265,11 +265,54 @@ async function useConnectLink(text) {
 }
 $("#login-qr").addEventListener("click", () => {
   if (!("BarcodeDetector" in window)) {
-    $("#login-error").textContent = "Ta przeglądarka nie czyta kodów QR. Zeskanuj kod aparatem telefonu: link sam otworzy War Room.";
+    $("#login-error").textContent = isApp() ? "Ten telefon nie czyta kodów QR w aplikacji. Wpisz adres i hasło ręcznie."
+      : "Ta przeglądarka nie czyta kodów QR. Zeskanuj kod aparatem telefonu: link sam otworzy War Room.";
     return;
   }
-  $("#login-qr-file").click();
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) scanQrLive();
+  else $("#login-qr-file").click();
 });
+/* Live scanner: camera preview that reads the code by itself; "Zrób zdjęcie" is the fallback. */
+async function scanQrLive() {
+  let stream = null; let stopped = false;
+  const video = el("video", { class: "qr-video", playsinline: true, autoplay: true, muted: true });
+  video.muted = true;
+  const stop = () => {
+    stopped = true; if (stream) stream.getTracks().forEach((t) => t.stop());
+    overlay.remove(); document.removeEventListener("keydown", onKey); $("#login-qr").focus();
+  };
+  const onKey = (e) => { if (e.key === "Escape") stop(); };
+  const overlay = el("div", { class: "qr-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Skanowanie kodu QR" },
+    el("div", { class: "qr-frame" }, video, el("span", { class: "qr-aim", "aria-hidden": "true" })),
+    el("p", { class: "qr-status", text: "Nakieruj aparat na kod QR z komputera (Ty → Połącz telefon)." }),
+    el("div", { class: "qr-actions" },
+      el("button", { type: "button", class: "btn ghost", text: "Zrób zdjęcie", onclick: () => { stop(); $("#login-qr-file").click(); } }),
+      el("button", { type: "button", class: "btn primary", text: "Anuluj", onclick: stop })));
+  document.body.append(overlay); document.addEventListener("keydown", onKey);
+  $(".qr-actions .primary", overlay).focus();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+  } catch (err) {
+    if (stopped) return;
+    stop();
+    $("#login-error").textContent = err && err.name === "NotAllowedError"
+      ? "Brak dostępu do aparatu. Zezwól na aparat albo zrób zdjęcie kodu." : "Nie mogę włączyć aparatu. Spróbuj zrobić zdjęcie kodu.";
+    return;
+  }
+  if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
+  video.srcObject = stream;
+  const detector = new BarcodeDetector({ formats: ["qr_code"] });
+  while (!stopped) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (stopped || video.readyState < 2) continue;
+    let codes = [];
+    try { codes = await detector.detect(video); } catch { continue; }
+    if (!codes.length) continue;
+    stop();
+    try { await useConnectLink(codes[0].rawValue); } catch (err) { $("#login-error").textContent = err.message; }
+    return;
+  }
+}
 $("#login-qr-file").addEventListener("change", async (e) => {
   const file = e.target.files[0]; e.target.value = "";
   if (!file) return;
@@ -424,9 +467,22 @@ document.querySelectorAll("[data-quick]").forEach((b) => b.addEventListener("cli
 $("#offline-fix").addEventListener("click", () => showTab("models"));
 /* Voice input (Web Speech API); the mic button only appears where the browser supports it. */
 (function setupMic() {
+  const btn = $("#start-mic");
+  if (isApp()) {
+    // The app's WebView has no speech recognition of its own: the app opens the phone's speech screen instead.
+    const bridge = window.AgenticOSAndroid;
+    if (!bridge || !bridge.canListen || !bridge.canListen()) return;
+    btn.classList.remove("hidden");
+    btn.addEventListener("click", () => {
+      const base = $("#start-text").value ? $("#start-text").value + " " : "";
+      window.aosSpeechResult = (text) => { window.aosSpeechResult = null; if (text) { $("#start-text").value = base + text; $("#start-text").focus(); } };
+      bridge.listen("pl-PL");
+    });
+    return;
+  }
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) return;
-  const btn = $("#start-mic"); btn.classList.remove("hidden");
+  btn.classList.remove("hidden");
   let rec = null;
   btn.addEventListener("click", () => {
     if (rec) { rec.stop(); return; }
@@ -1352,6 +1408,8 @@ function keyHint() {
   $("#provider-key-hint").classList.toggle("hidden", !need);
 }
 $("#provider-form").elements.base_url.addEventListener("input", keyHint);
+/* With gesture navigation there is no long press of Back, so the app's address dialog opens from Ty. */
+$("#me-address").addEventListener("click", () => { location.href = "agentic-os://settings"; });
 $("#provider-add").addEventListener("click", () => fillProviderForm(state.presets[0] || { id: "", kind: "openai_compat" }, true));
 $("#provider-preset").addEventListener("change", (e) => fillProviderForm(state.presets[Number(e.target.value)], true));
 $("#provider-form").addEventListener("submit", withBusy($("#provider-form"), async (fd) => {
@@ -1372,6 +1430,8 @@ function serverLabel() {
 }
 function loadMe() {
   $("#me-server").textContent = `Połączono z serwerem · ${serverLabel()}`;
+  $("#me-address").classList.toggle("hidden", !isApp());
+  $("#me-address-value").textContent = location.host;
   const a = agentInfo();
   const native = a.kind !== "external";
   $("#me-permission-value").textContent = native ? PERM_SHORT[a.permission] || "Autonomiczny" : "zewnętrzny";
