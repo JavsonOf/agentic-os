@@ -7,6 +7,7 @@ Endpoints (JSON in, JSON out):
 
 =======  ================================  =========================================
 GET      /health                           liveness probe
+GET      /usage?period=today|week|month    requests and tokens per day and per provider
 GET      /status                           OS summary
 GET      /metrics                          counters and latency percentiles
 GET      /agents                           registered agents
@@ -269,6 +270,12 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
             if method == "GET":
                 if path == "/health":
                     return 200, {"status": "ok"}
+                if path == "/usage":
+                    period = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get("period", ["week"])[0]
+                    days = {"today": 1, "week": 7, "month": 30}.get(period)
+                    if days is None:
+                        raise HTTPError(400, "period must be today, week or month")
+                    return 200, {"period": period, **system.providers.history(days)}
                 if path == "/status":
                     return 200, system.status()
                 if path == "/metrics":

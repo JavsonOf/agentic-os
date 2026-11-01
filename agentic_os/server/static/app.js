@@ -1097,7 +1097,31 @@ $("#kb-form").addEventListener("submit", withBusy($("#kb-form"), async (fd) => {
 
 /* ----------------------------------------------------------- models (C4) */
 const POPULAR = ["gemini", "anthropic", "openrouter", "openai"];
+/* Modele → Zużycie: how many tokens and requests went to each provider (Dziś / 7 dni / Miesiąc). */
+const fmtNum = (n) => n >= 1e6 ? (n / 1e6).toFixed(1).replace(".", ",") + " mln" : n >= 1e4 ? Math.round(n / 1e3) + " tys." : String(n);
+async function loadUsage(period = store.get("aos_usage_period", "week")) {
+  store.set("aos_usage_period", period);
+  document.querySelectorAll("#usage-periods button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.period === period)));
+  let u;
+  try { u = await api(`/usage?period=${period}`); } catch (err) { toast(err.message, true); return; }
+  const total = u.input + u.output;
+  $("#usage-tokens").textContent = fmtNum(total);
+  $("#usage-sub").textContent = `${plural(total, "token", "tokeny", "tokenów")} · ${u.calls} ${plural(u.calls, "zapytanie", "zapytania", "zapytań")}`;
+  $("#usage-in").textContent = "wejście " + fmtNum(u.input);
+  $("#usage-out").textContent = "wyjście " + fmtNum(u.output);
+  const max = Math.max(1, ...u.days.map((d) => d.input + d.output));
+  $("#usage-bars").classList.toggle("hidden", u.days.length < 2);
+  $("#usage-bars").replaceChildren(...u.days.map((d, i) => el("div", { class: "bar" + (i === u.days.length - 1 ? " today" : ""),
+    title: `${d.date}: ${fmtNum(d.input + d.output)} tokenów, ${d.calls} zapytań`,
+    style: `height:${Math.max(3, Math.round((d.input + d.output) / max * 86))}px` })));
+  $("#usage-providers").replaceChildren(...(u.providers.length ? u.providers.map((p) => el("div", { class: "usage-prov" },
+    el("span", { class: "dot" }),
+    el("div", { class: "name" }, el("b", { text: p.label }), el("span", { text: `${p.calls} ${plural(p.calls, "zapytanie", "zapytania", "zapytań")}` })),
+    el("b", { text: fmtNum(p.input + p.output) }))) : [el("p", { class: "muted small", text: "Brak zapytań w tym okresie." })]));
+}
+document.querySelectorAll("#usage-periods button").forEach((b) => b.addEventListener("click", () => loadUsage(b.dataset.period)));
 async function loadModels() {
+  loadUsage();
   let data;
   try { data = await refreshProviders(); } catch (err) { toast(err.message, true); return; }
   const def = data.default;

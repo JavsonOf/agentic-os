@@ -385,6 +385,20 @@
           <button id="provider-add" class="head-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Dostawca</button>
         </header>
         <div id="provider-cards" class="provider-cards"></div>
+        <section class="card usage-card" aria-labelledby="usage-title">
+          <div class="usage-head">
+            <h3 id="usage-title" class="card-title">Zużycie</h3>
+            <div class="seg" role="tablist" aria-label="Okres" id="usage-periods">
+              <button type="button" role="tab" data-period="today" aria-selected="false">Dziś</button>
+              <button type="button" role="tab" data-period="week" aria-selected="true">7 dni</button>
+              <button type="button" role="tab" data-period="month" aria-selected="false">Miesiąc</button>
+            </div>
+          </div>
+          <div class="usage-total"><strong id="usage-tokens">0</strong><span class="muted" id="usage-sub">tokenów · 0 zapytań</span></div>
+          <div class="chips"><span class="pill-soft" id="usage-in">wejście 0</span><span class="pill-soft" id="usage-out">wyjście 0</span></div>
+          <div class="usage-bars" id="usage-bars" role="img" aria-label="Tokeny dzień po dniu"></div>
+          <div class="usage-providers" id="usage-providers"></div>
+        </section>
         <details class="card form-card" id="provider-form-card">
           <summary>Dostawca i klucz API</summary>
           <form id="provider-form" class="stack">

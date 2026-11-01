@@ -97,14 +97,64 @@ class ProviderRegistry:
             json.dump(self._usage, fh)
         os.replace(tmp, self._usage_path)
 
-    def record_call(self, provider_id: str) -> None:
+    HISTORY_DAYS = 31  # daily totals kept for the "Miesiąc" view
+
+    def record_call(self, provider_id: str, usage: dict[str, int] | None = None) -> None:
+        """Count one request (and its tokens, when known) for today."""
         today = time.strftime("%Y-%m-%d")
         with self._lock:
             entry = self._usage.setdefault(provider_id, {})
             if entry.get("date") != today:
                 entry["date"], entry["count"] = today, 0
             entry["count"] = entry.get("count", 0) + 1
+            day = entry.setdefault("days", {}).setdefault(today, {"calls": 0, "input": 0, "output": 0})
+            day["calls"] += 1
+            self._add_tokens(day, usage)
+            for old in sorted(entry["days"])[: max(0, len(entry["days"]) - self.HISTORY_DAYS)]:
+                del entry["days"][old]
             self._save_usage()
+
+    def record_tokens(self, provider_id: str, usage: dict[str, int] | None) -> None:
+        """Add the tokens of a finished request to today's totals."""
+        if not usage:
+            return
+        today = time.strftime("%Y-%m-%d")
+        with self._lock:
+            day = self._usage.setdefault(provider_id, {}).setdefault("days", {}).setdefault(
+                today, {"calls": 0, "input": 0, "output": 0})
+            self._add_tokens(day, usage)
+            self._save_usage()
+
+    @staticmethod
+    def _add_tokens(day: dict[str, int], usage: dict[str, int] | None) -> None:
+        for key, field in (("input_tokens", "input"), ("output_tokens", "output")):
+            value = (usage or {}).get(key, 0)
+            if isinstance(value, int) and value > 0:
+                day[field] = day.get(field, 0) + value
+
+    def history(self, days: int) -> dict[str, Any]:
+        """Requests and tokens per provider and per day for the last ``days`` days (today included)."""
+        now = time.time()
+        dates = [time.strftime("%Y-%m-%d", time.localtime(now - 86400 * i)) for i in reversed(range(days))]
+        totals = {d: {"date": d, "calls": 0, "input": 0, "output": 0} for d in dates}
+        providers = []
+        with self._lock:
+            for pid, entry in self._usage.items():
+                row = {"id": pid, "calls": 0, "input": 0, "output": 0}
+                for d in dates:
+                    day = entry.get("days", {}).get(d)
+                    if not day:
+                        continue
+                    for k in ("calls", "input", "output"):
+                        row[k] += day.get(k, 0)
+                        totals[d][k] += day.get(k, 0)
+                if row["calls"] or row["input"] or row["output"]:
+                    label = self._items[pid].label if pid in self._items else pid
+                    providers.append({**row, "label": label or pid})
+        providers.sort(key=lambda r: r["input"] + r["output"], reverse=True)
+        series = list(totals.values())
+        return {"calls": sum(d["calls"] for d in series), "input": sum(d["input"] for d in series),
+                "output": sum(d["output"] for d in series), "days": series, "providers": providers}
 
     def record_test(self, provider_id: str, ok: bool) -> None:
         with self._lock:
@@ -165,8 +215,10 @@ class ProviderRegistry:
         complete = llm.complete
 
         def counted(*args: Any, **kwargs: Any) -> Any:
-            self.record_call(provider_id)
-            return complete(*args, **kwargs)
+            self.record_call(provider_id)  # counted even when the request fails: the provider saw it
+            response = complete(*args, **kwargs)
+            self.record_tokens(provider_id, getattr(response, "usage", None))
+            return response
 
         llm.complete = counted  # type: ignore[method-assign]  # same object and type, calls are counted
         return llm
