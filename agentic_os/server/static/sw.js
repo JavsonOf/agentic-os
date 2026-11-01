@@ -1,5 +1,5 @@
 /* Agentic OS service worker: caches the app shell so it opens like an app; API calls always go to the network. */
-const CACHE = "aos-shell-v17";
+const CACHE = "aos-shell-v18";
 const SHELL = ["/", "/app.js", "/errors.js", "/qr.js", "/app.css", "/icon.svg", "/icon-192.png", "/manifest.webmanifest", "/wake.html"];
 // A server that does not answer (a sleeping Codespace replies 404, a proxy 502-504) gets the "Serwer śpi" screen.
 const ASLEEP = new Set([404, 502, 503, 504]);

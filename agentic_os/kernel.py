@@ -617,8 +617,9 @@ class AgenticOS:
                     self._save_specs()
         item._event.set()
 
-    def update_agent(self, name: str, *, permission: str | None = None, mode: str | None = None) -> Agent:
-        """Change an agent's permission level and/or thinking mode at any time.
+    def update_agent(self, name: str, *, permission: str | None = None, mode: str | None = None,
+                     skills: list[str] | None = None) -> Agent:
+        """Change an agent's permission level, thinking mode and/or skills at any time.
 
         The agent is rebuilt from its saved spec, so tools, delegation and
         instructions follow the new setting; chat sessions, learned strategy
@@ -636,6 +637,11 @@ class AgenticOS:
             spec["permission"] = permission
         if mode is not None:
             spec["mode"] = mode
+        if skills is not None:
+            unknown = [s for s in skills if self.skills.get(s) is None]
+            if unknown:
+                raise ValueError(f"Unknown skill: {', '.join(unknown)}")
+            spec["skills"] = list(dict.fromkeys(skills))  # keep the order, drop repeats
         spec["always_allow"] = sorted(getattr(agent, "always_allow", set()))
         if name in self._bandits:
             self._save_bandits()

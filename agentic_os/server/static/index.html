@@ -203,6 +203,24 @@
         </details>
       </section>
 
+      <!-- AGENT: ekran jednego agenta -->
+      <section id="tab-agent" class="panel">
+        <button class="back-btn" type="button" data-go="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Agenci</span></button>
+        <div class="agent-head">
+          <span class="tile soft agent-head-tile" id="agent-screen-tile"></span>
+          <div class="agent-head-text">
+            <h2 id="agent-screen-name">agent</h2>
+            <span class="muted" id="agent-screen-sub"></span>
+          </div>
+        </div>
+        <section class="card stack" aria-labelledby="agent-screen-skills-title">
+          <h3 id="agent-screen-skills-title" class="card-title">Skille</h3>
+          <div id="agent-screen-skills" class="chips" role="group" aria-labelledby="agent-screen-skills-title"></div>
+          <p class="muted small" id="agent-screen-hint">Dotknij skilla, żeby go włączyć albo wyłączyć.</p>
+        </section>
+        <button class="btn primary btn-wide" id="agent-screen-save" type="button">Zapisz agenta</button>
+      </section>
+
 
       <!-- ZADANIA -->
       <section id="tab-tasks" class="panel">

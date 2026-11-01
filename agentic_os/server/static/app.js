@@ -29,6 +29,7 @@ function el(tag, attrs = {}, ...children) {
 }
 const ICONS = {
   robot: '<rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
@@ -296,10 +297,11 @@ function redrawBrain() { if (state.tab === "brain" && brain.nodes.length) simula
 
 /* ------------------------------------------------------------------- tabs */
 /* Five tabs in the bottom bar; the other screens open from them and keep their tab lit. */
-const TAB_PARENT = { agents: "me", ext: "me", monitor: "me", brain: "knowledge", convo: "chat" };
+const TAB_PARENT = { agents: "me", agent: "me", ext: "me", monitor: "me", brain: "knowledge", convo: "chat" };
 const LOADERS = {
   chat: () => loadStart(), convo: () => openConvo(), agents: () => loadAgents(), tasks: () => loadTasks(), brain: () => loadBrain(),
   knowledge: () => loadKnowledge(), ext: () => loadExt(), models: () => loadModels(), monitor: () => loadMonitor(), me: () => loadMe(),
+  agent: () => loadAgentScreen(),
 };
 function showTab(name) {
   if (!document.getElementById("tab-" + name)) name = "chat";
@@ -733,6 +735,7 @@ async function loadAgents() {
     a.learning ? el("p", { class: "small", text: "📈 " + Object.entries(a.learning.strategies).map(([k, v]) => `${STRATEGIES[k] || k}: ${v.pulls ? `${v.mean_reward > 0 ? "+" : ""}${v.mean_reward} (${v.pulls}×)` : "–"}`).join(" · ") + (a.learning.best ? ` → najlepszy: ${STRATEGIES[a.learning.best] || a.learning.best}` : "") }) : null,
     el("div", { class: "actions" },
       el("button", { class: "btn small", type: "button", text: "💬 Czat", onclick: () => { selectAgent(a.name); showTab("convo"); } }),
+      a.kind !== "external" ? el("button", { class: "btn small ghost", type: "button", text: "✏️ Edytuj", onclick: () => openAgentScreen(a.name) }) : null,
       a.name !== "assistant" ? el("button", { class: "btn small ghost danger", type: "button", text: "Usuń", onclick: async () => {
         if (!confirm(`Usunąć agenta ${a.name}?`)) return;
         try { await api(`/agents/${a.name}`, { method: "DELETE" }); toast("Usunięto"); loadAgents(); } catch (err) { toast(err.message, true); }
@@ -746,6 +749,48 @@ async function loadAgents() {
   if (!ext.options.length) {
     ext.replaceChildren(el("option", { value: "", text: "— wybierz —" }), ...state.extPresets.map((p, i) => el("option", { value: String(i), text: p.label })));
   }
+}
+/* ------------------------------------------- agent screen (Edytuj agenta) */
+function openAgentScreen(name) {
+  store.set("aos_edit_agent", name);
+  showTab("agent");
+}
+async function loadAgentScreen() {
+  const name = store.get("aos_edit_agent", "assistant");
+  let skills = [];
+  try { [, , { skills }] = await Promise.all([refreshAgents(), refreshProviders(), api("/skills")]); } catch (err) { toast(err.message, true); return; }
+  const a = state.agents.find((x) => x.name === name);
+  if (!a || a.kind === "external") { showTab("agents"); return; }
+  const index = state.agents.indexOf(a);
+  const p = state.providers.find((x) => x.id === a.provider);
+  $("#agent-screen-tile").className = "tile agent-head-tile " + (index % 2 ? "amber" : "soft");
+  $("#agent-screen-tile").replaceChildren(icon(index % 2 ? "pen" : "robot", 24));
+  $("#agent-screen-name").textContent = a.name;
+  $("#agent-screen-sub").textContent = "Agent · " + (a.model || (p ? providerName(p) : "model domyślny"));
+  const chosen = new Set(a.skills || []);
+  const chip = (s) => {
+    const on = chosen.has(s.name);
+    return el("button", { type: "button", class: "skill-chip", "aria-pressed": String(on), title: s.description || s.name,
+      onclick: (e) => {
+        const now = !chosen.has(s.name);
+        if (now) chosen.add(s.name); else chosen.delete(s.name);
+        e.currentTarget.setAttribute("aria-pressed", String(now));
+        e.currentTarget.replaceChildren(...(now ? [icon("check", 14)] : []), s.name);
+      } }, ...(on ? [icon("check", 14)] : []), s.name);
+  };
+  $("#agent-screen-skills").replaceChildren(...(skills.length ? skills.map(chip)
+    : [el("span", { class: "muted small", text: "Brak skilli. Dodaj je w Ty → Rozszerzenia albo w Ty → Agenci → Gotowy zespół." })]));
+  $("#agent-screen-hint").classList.toggle("hidden", !skills.length);
+  const save = $("#agent-screen-save");
+  save.onclick = async () => {
+    save.disabled = true;
+    try {
+      const keep = skills.map((s) => s.name).filter((n) => chosen.has(n));
+      await api(`/agents/${a.name}/settings`, { method: "POST", body: { skills: keep } });
+      toast("Zapisano agenta ✅");
+      showTab("agents");
+    } catch (err) { toast(err.message, true); } finally { save.disabled = false; }
+  };
 }
 function agentTraits(a) {
   if (a.kind === "external") return null;

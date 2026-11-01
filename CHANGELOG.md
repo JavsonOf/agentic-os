@@ -46,7 +46,16 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Reliability Fixes: Safe Saving, Planner, Schedules and Models
+Tytuł: Agent Screen with Skill Tiles
+
+### Dodano
+- Ekran agenta: w Ty → Agenci przy każdym agencie jest przycisk „✏️ Edytuj”.
+  - U góry ikona agenta, jego nazwa i model, z którego korzysta.
+  - Karta „Skille” pokazuje wszystkie dostępne skille jako kafelki: dotknięcie włącza albo wyłącza skill (włączony jest zielony, z ptaszkiem).
+  - „Zapisz agenta” od razu zmienia skille agenta. Jego uprawnienia, tryb myślenia, rozmowy i zgody zostają bez zmian.
+
+## v0.4.2 – Reliability Fixes: Safe Saving, Planner, Schedules and Models
+_01.11.2026_
 
 ### Naprawiono
 - Ustawienia, agenci, skille, mody, harmonogram i pamięć zapisują się bezpiecznie: awaria w trakcie zapisu nie zostawia już uszkodzonego pliku.
