@@ -46,7 +46,11 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Formatted Replies: Lists, Tables and Code
+### Drobne zmiany
+- Skill `/scal-i-sprawdz` dla Claude Code w repozytorium (`.claude/skills/`): scala PR, gdy testy są zielone, a potem po kolei sprawdza opisy wydań i nowe wydanie.
+
+## v0.10.0 – Formatted Replies: Lists, Tables and Code
+_01.11.2026_
 
 ### Dodano
 - Odpowiedzi agentów są ładnie sformatowane, zamiast pokazywać surowe znaczki Markdown (#, *, |, ```).
