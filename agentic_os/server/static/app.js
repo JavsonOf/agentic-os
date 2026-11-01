@@ -42,6 +42,9 @@ const ICONS = {
   chevRight: '<path d="M9 6l6 6-6 6"/>',
   chat: '<path d="M4 5h16v11H9l-5 4z"/>',
   alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  share: '<path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/>',
+  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
 };
 function icon(name, size = 20) {
   const wrap = document.createElement("span");
@@ -720,7 +723,38 @@ function renderAgentReply(node, proc) {
   const chip = el("button", { type: "button", class: "tool-chip", "aria-expanded": "false", onclick: () => {
     const open = detail.classList.toggle("hidden") === false; chip.setAttribute("aria-expanded", String(open));
   } }, icon("wrench", 15), toolChipLabel(r), icon("chevDown", 14));
-  node.append(chip, detail);
+  node.append(el("div", { class: "reply-bar" }, chip, ...replyActions(r.output || "", node.dataset.q || "")), detail);
+  if (node === lastAgentNode()) node.append(followUps());
+}
+/* A reply is not a dead end: copy or share it, turn the question into a daily task, or follow up with one tap. */
+function lastAgentNode() { const all = chatLog.querySelectorAll(".msg.agent"); return all[all.length - 1]; }
+function replyActions(text, question) {
+  const act = (name, label, fn) => el("button", { type: "button", class: "reply-act", "aria-label": label, title: label, onclick: fn }, icon(name, 16));
+  const out = [act("copy", "Kopiuj odpowiedź", async () => {
+    try { await navigator.clipboard.writeText(text); toast("Skopiowano"); } catch { toast("Nie udało się skopiować", true); }
+  })];
+  if (navigator.share) out.push(act("share", "Udostępnij odpowiedź", () => navigator.share({ text }).catch(() => {})));
+  if (question) {
+    out.push(el("button", { type: "button", class: "reply-act wide", title: "Agent zrobi to sam codziennie o wybranej godzinie",
+      onclick: () => repeatDaily(question) }, icon("repeat", 15), "Rób to codziennie"));
+  }
+  return out;
+}
+function repeatDaily(question) {
+  const agent = currentAgent();
+  showTab("tasks"); editSchedule(null);
+  const E = $("#schedule-form").elements;
+  E.title.value = question.length > 60 ? question.slice(0, 57) + "…" : question;
+  E.task.value = question; E.agent.value = agent; E.days.value = "daily";
+  showNextRun();
+  toast("Ustaw godzinę i zapisz – agent zrobi to sam");
+}
+const FOLLOW_UPS = [["Krócej", "Napisz to krócej, w 2–3 zdaniach."], ["Więcej szczegółów", "Rozwiń to i dodaj więcej szczegółów."],
+  ["W punktach", "Przedstaw to w punktach."]];
+const FOLLOW_PROMPTS = new Set(FOLLOW_UPS.map(([, prompt]) => prompt));
+function followUps() {
+  return el("div", { class: "reply-follow", role: "group", "aria-label": "Szybkie odpowiedzi" },
+    ...FOLLOW_UPS.map(([label, prompt]) => el("button", { type: "button", class: "follow-chip", text: label, onclick: () => sendMessage(prompt) })));
 }
 /* The conversation is kept in this browser so a reload, a dropped connection or a closed tab never loses an answer. */
 const CHAT_KEEP = 60;
@@ -766,16 +800,19 @@ function renderChat() {
   const entries = loadChat(agent);
   chatLog.replaceChildren();
   if (!entries.length) chatEmpty();
-  let lastDay = null;
+  let lastDay = null; let lastQuestion = "";
   for (const e of entries) {
     if (e.at && (lastDay === null || dayDiff(e.at) !== lastDay)) { lastDay = dayDiff(e.at); chatLog.append(el("span", { class: "day-sep", text: dayLabel(e.at) })); }
-    if (e.role === "user") { userMsg(e); continue; }
+    if (e.role === "user") { userMsg(e); if (!FOLLOW_PROMPTS.has(e.text)) lastQuestion = e.text; continue; }
     if (e.role === "note") { addMsg("note", e.text); continue; }
     const node = addMsg("agent thinking", e.pid ? "Myślę…" : "⚠️ " + (e.error || "Błąd"));
+    node.dataset.q = lastQuestion;
     if (e.done) renderAgentReply(node, e.done);
     else if (e.pid) followReply(agent, e.pid, node);
     else node.classList.remove("thinking");
   }
+  const newest = lastAgentNode();
+  chatLog.querySelectorAll(".reply-follow").forEach((n) => { if (n.parentElement !== newest) n.remove(); });
   renderApprovals(state.approvals || [], true);
   chatLog.scrollTop = chatLog.scrollHeight;
 }
@@ -832,7 +869,11 @@ async function sendMessage(text) {
   const entry = { role: "user", text, at: Date.now() };
   userMsg(entry);
   updateChat(agent, (list) => list.push(entry));
+  chatLog.querySelectorAll(".reply-follow").forEach((n) => n.remove()); // follow-ups belong to the newest reply only
+  const before = lastAgentNode();
   const reply = addMsg("agent thinking", "Myślę…");
+  // "W punktach" only reshapes the previous answer, so "Rób to codziennie" keeps the original question.
+  reply.dataset.q = FOLLOW_PROMPTS.has(text) ? (before && before.dataset.q) || "" : text;
   let proc;
   try {
     proc = await api("/chat", { method: "POST", body: { message: text, agent, session: sessionId(agent), async: true } });
