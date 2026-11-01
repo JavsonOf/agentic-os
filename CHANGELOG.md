@@ -46,7 +46,17 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Connect AI in 60 Seconds
+Tytuł: Reply Actions and One-Tap Follow-Ups
+
+### Dodano
+- Akcje pod każdą odpowiedzią agenta w czacie: odpowiedź nie kończy już rozmowy.
+  - „Kopiuj”: cała odpowiedź trafia do schowka.
+  - „Udostępnij” (na telefonie): wysyłasz odpowiedź dalej, np. przez komunikator albo e-mail.
+  - „Rób to codziennie”: jednym dotknięciem pytanie staje się zaplanowanym zadaniem. Formularz otwiera się z nazwą, treścią i agentem już wpisanymi, wystarczy wybrać godzinę i zapisać.
+- Szybkie odpowiedzi pod ostatnią odpowiedzią agenta: „Krócej”, „Więcej szczegółów” i „W punktach” wysyłają gotową prośbę bez pisania.
+
+## v0.7.0 – Connect AI in 60 Seconds
+_01.11.2026_
 
 ### Dodano
 - „Połącz AI w 60 sekund”: prowadzone podłączenie modelu AI zamiast długiego formularza. Otwiera się z przycisku „Połącz AI” na ekranie startowym i w zakładce Modele.
