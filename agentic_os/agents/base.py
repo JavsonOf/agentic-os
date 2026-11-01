@@ -206,6 +206,9 @@ class Agent:
             else:
                 result.stopped_reason = "max_steps"
                 result.output = last_text or "Stopped: reached the step limit before finishing."
+                # End the turn on an assistant message: a history that goes tool result -> next user message
+                # is rejected by strict OpenAI-compatible APIs on the following chat message.
+                turn.append(Message.assistant(result.output))
 
             result.usage = usage
             result.messages = turn

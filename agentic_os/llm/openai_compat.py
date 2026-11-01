@@ -7,6 +7,7 @@ other server that speaks ``POST {base_url}/chat/completions``.
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import time
@@ -69,6 +70,8 @@ def post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeou
             raise LLMError(f"HTTP {exc.code} from {url}: {detail[:500]}") from exc
         except urllib.error.URLError as exc:
             raise LLMError(f"Cannot reach {url}: {exc.reason}") from exc
+        except (OSError, http.client.HTTPException) as exc:  # timeout or reset while reading the reply
+            raise LLMError(f"Connection to {url} failed: {type(exc).__name__}: {exc}") from exc
     return _decode(body, url)
 
 
@@ -82,6 +85,8 @@ def get_json(url: str, headers: dict[str, str], timeout: float = 30.0) -> dict[s
         raise LLMError(f"HTTP {exc.code} from {url}: {exc.read().decode('utf-8', 'replace')[:500]}") from exc
     except urllib.error.URLError as exc:
         raise LLMError(f"Cannot reach {url}: {exc.reason}") from exc
+    except (OSError, http.client.HTTPException) as exc:
+        raise LLMError(f"Connection to {url} failed: {type(exc).__name__}: {exc}") from exc
     return _decode(body, url)
 
 
@@ -111,6 +116,10 @@ class OpenAICompatProvider(LLMProvider):
         self.api_key = api_key
         self.extra_headers = dict(extra_headers or {})
         self.timeout = timeout
+        # Learned from the provider's first 400: newer OpenAI models want "max_completion_tokens",
+        # some providers (e.g. DeepSeek) cap the output lower than our default.
+        self._token_field = "max_tokens"
+        self._token_cap: int | None = None
 
     def complete(
         self,
@@ -120,11 +129,7 @@ class OpenAICompatProvider(LLMProvider):
         tools: list[Tool] | None = None,
         max_tokens: int = 16000,
     ) -> LLMResponse:
-        payload: dict[str, Any] = {
-            "model": self.model,
-            "messages": to_openai_messages(messages, system),
-            "max_tokens": max_tokens,
-        }
+        payload: dict[str, Any] = {"model": self.model, "messages": to_openai_messages(messages, system)}
         if tools:
             payload["tools"] = [
                 {"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}}
@@ -133,7 +138,31 @@ class OpenAICompatProvider(LLMProvider):
         headers = dict(self.extra_headers)
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        return from_openai_response(post_json(f"{self.base_url}/chat/completions", payload, headers, self.timeout), self.model)
+        url = f"{self.base_url}/chat/completions"
+        for attempt in range(3):
+            limit = min(max_tokens, self._token_cap) if self._token_cap else max_tokens
+            body = {**payload, self._token_field: limit}
+            try:
+                return from_openai_response(post_json(url, body, headers, self.timeout), self.model)
+            except LLMError as exc:
+                if attempt == 2 or not self._adapt_token_limit(str(exc), limit):
+                    raise
+        raise AssertionError("unreachable")
+
+    def _adapt_token_limit(self, error: str, sent: int) -> bool:
+        """After a 400 about the output-length parameter, adjust it once and say whether to retry."""
+        if not error.startswith("HTTP 400") or "max_tokens" not in error and "max_completion_tokens" not in error:
+            return False
+        if self._token_field == "max_tokens" and "max_completion_tokens" in error:
+            self._token_field = "max_completion_tokens"
+            return True
+        detail = error.split(": ", 1)[1] if ": " in error else error  # not the status code or the URL
+        caps = [int(n) for n in re.findall(r"\b(\d{3,6})\b", detail) if 255 < int(n) < sent]
+        cap = max(caps) if caps else (8192 if sent > 8192 else 0)
+        if cap and cap != self._token_cap:
+            self._token_cap = cap
+            return True
+        return False
 
 
 def to_openai_messages(messages: list[Message], system: str | None = None) -> list[dict[str, Any]]:

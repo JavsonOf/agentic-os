@@ -54,7 +54,8 @@ with AgenticOS() as system:
 
 **Provider selection.** `AGENTIC_OS_PROVIDER=auto` (the default) uses Claude
 when the `anthropic` package and an `ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`
-are present, then Gemini when `google-genai` and a `GEMINI_API_KEY` are present,
+are present, then Gemini when a `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) is present (the `google-genai`
+package is optional: without it Gemini is reached through its OpenAI-compatible endpoint),
 and otherwise an offline heuristic model, so the examples and tests run anywhere.
 To force a provider, set `AGENTIC_OS_PROVIDER=anthropic` (for example with an
 `ant auth login` profile), `=gemini` (default model `gemini-flash-latest`) or
@@ -163,20 +164,27 @@ curl -s localhost:8000/run -H 'Authorization: Bearer change-me' \
 curl -s localhost:8000/processes/<pid> -H 'Authorization: Bearer change-me'
 ```
 
-Endpoints: `GET /health /status /metrics /agents /processes /processes/{pid} /traces/{trace_id}`,
-`POST /run /agents /knowledge /goal /processes/{pid}/feedback`. Details are in
+Main endpoints:
+
+* agents and runs: `/agents`, `/run`, `/chat`, `/crew`, `/goal`, `/processes`, `/approvals`, `/schedules`
+* models and extensions: `/providers`, `/skills`, `/mods`, `/mcp`, `/teams`
+* knowledge and memory: `/knowledge`, `/knowledge/upload`, `/memory`, `/memory/import`, `/graph`
+* monitoring: `/health`, `/status`, `/metrics`, `/traces/{trace_id}`
+
+The full list with methods and request bodies is at the top of
 [`agentic_os/server/__init__.py`](agentic_os/server/__init__.py).
 
 ```bash
 docker build -t agentic-os .
-docker run -p 8000:8000 -e ANTHROPIC_API_KEY -e AGENTIC_OS_API_KEY=change-me agentic-os
+docker run -p 8000:8000 -e ANTHROPIC_API_KEY -e AGENTIC_OS_API_KEY=change-me \
+  -v agentic-data:/home/agent/data agentic-os   # the volume keeps agents, keys and memory across restarts
 ```
 
 ## Development
 
 ```bash
 pip install -e ".[dev,anthropic]"
-pytest -q            # 60 tests, fully offline (no API calls)
+pytest -q            # fully offline (no API calls)
 ruff check .
 for f in examples/*.py; do python "$f"; done
 ```

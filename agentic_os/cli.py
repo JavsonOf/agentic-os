@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     def common(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--provider", choices=["auto", "anthropic", "mock"], help="LLM provider (default: auto)")
+        p.add_argument("--provider", choices=["auto", "anthropic", "gemini", "mock"], help="LLM provider (default: auto)")
         p.add_argument("--model", help="model id (default: claude-opus-5-5)")
         p.add_argument("--docs", nargs="*", metavar="FILE", help="files to ingest into the knowledge base")
 

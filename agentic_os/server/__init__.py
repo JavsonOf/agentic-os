@@ -59,8 +59,10 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import os
 import re
+import threading
 import time
 import urllib.parse
 from dataclasses import asdict
@@ -76,9 +78,10 @@ from agentic_os.mods import mod_from_dict
 from agentic_os.providers import PRESETS, ProviderConfig
 from agentic_os.rag.extract import extract_text, file_type
 from agentic_os.rag.pipeline import Document
-from agentic_os.schedules import Schedule
+from agentic_os.schedules import Schedule, as_bool
 from agentic_os.skills import Skill, parse_skill_md
 
+log = logging.getLogger("agentic_os.server")
 MAX_BODY = 2 * 1024 * 1024
 MAX_UPLOAD = 60 * 1024 * 1024
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -131,8 +134,14 @@ def _existing_limit(system: AgenticOS, provider_id: str) -> int:
     return next((p["daily_limit"] for p in system.providers.public() if p["id"] == provider_id), 0)
 
 
+LOGIN_WINDOW = 300  # seconds
+LOGIN_MAX_FAILURES = 20  # wrong passwords per address in that window before it has to wait
+
+
 def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
     api_key = system.settings.api_key
+    failures: dict[str, list[float]] = {}  # client address -> times of recent wrong passwords
+    failures_lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "AgenticOS/0.1"
@@ -149,8 +158,17 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
             self.end_headers()
             self.wfile.write(data)
 
+        def _content_length(self) -> int:
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                raise HTTPError(400, "Invalid Content-Length") from None
+            if length < 0:  # a negative length would make read() take the whole stream, past every limit
+                raise HTTPError(400, "Invalid Content-Length")
+            return length
+
         def _body(self) -> dict[str, Any]:
-            length = int(self.headers.get("Content-Length") or 0)
+            length = self._content_length()
             if length > MAX_BODY:
                 raise HTTPError(413, "Request body too large")
             if not length:
@@ -185,9 +203,19 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
             path = self.path.split("?", 1)[0]
             if not api_key or path == "/health" or path in STATIC_FILES:
                 return
+            client = self.client_address[0]
+            now = time.time()
+            with failures_lock:
+                recent = [t for t in failures.get(client, []) if now - t < LOGIN_WINDOW]
+                failures[client] = recent
+                if len(recent) >= LOGIN_MAX_FAILURES:  # slows password guessing to a crawl
+                    raise HTTPError(429, "Too many wrong passwords, try again in a few minutes")
             header = self.headers.get("Authorization", "")
             token = header.removeprefix("Bearer ").strip()
             if not hmac.compare_digest(token.encode(), api_key.encode()):
+                if token:  # a request with no password at all is not a guess
+                    with failures_lock:
+                        failures.setdefault(client, []).append(now)
                 raise HTTPError(401, "Missing or invalid API key")
 
         def _static(self, path: str) -> bool:
@@ -221,9 +249,11 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 self._send(404, {"error": str(exc)})
             except (LLMError, MCPError, ValueError) as exc:
                 self._send(400, {"error": str(exc)})
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 system.metrics.incr("http.errors")
-                self._send(500, {"error": f"{type(exc).__name__}: {exc}"})
+                log.exception("Unhandled error on %s %s", method, self.path.split("?", 1)[0])
+                # The type and a short message help the owner; paths and long internals stay in the server log.
+                self._send(500, {"error": f"{type(exc).__name__}: {str(exc).splitlines()[0][:200] if str(exc) else ''}"})
 
         def do_GET(self) -> None:
             self._dispatch("GET")
@@ -295,7 +325,7 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
 
             if method == "DELETE":
                 if m := re.fullmatch(r"/providers/([\w-]+)", path):
-                    if not system.providers.remove(m.group(1)):
+                    if not system.remove_provider(m.group(1)):
                         raise HTTPError(404, f"No provider {m.group(1)!r}")
                     return 200, {"ok": True}
                 if m := re.fullmatch(r"/knowledge/([\w:-]+)", path):
@@ -320,7 +350,7 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
 
             if path == "/knowledge/upload":
                 query = urllib.parse.parse_qs(self.path.partition("?")[2])
-                length = int(self.headers.get("Content-Length") or 0)
+                length = self._content_length()
                 if length > MAX_UPLOAD:
                     raise HTTPError(413, "Plik jest za duży (max 60 MB)")
                 raw = self.rfile.read(length) if length else b""
@@ -336,7 +366,7 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
 
             if path == "/memory/import":
                 query = urllib.parse.parse_qs(self.path.partition("?")[2])
-                length = int(self.headers.get("Content-Length") or 0)
+                length = self._content_length()
                 if length > MAX_UPLOAD:
                     raise HTTPError(413, "Plik jest za duży (max 60 MB)")
                 raw = self.rfile.read(length) if length else b""
@@ -496,7 +526,7 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
             if path == "/schedules":
                 sched = Schedule(task=str(body.get("task") or ""), time=str(body.get("time") or "07:30"),
                                  agent=str(body.get("agent") or "assistant"), days=str(body.get("days") or "daily"),
-                                 title=str(body.get("title") or ""), enabled=bool(body.get("enabled", True)),
+                                 title=str(body.get("title") or ""), enabled=as_bool(body.get("enabled", True)),
                                  tz=str(body.get("tz") or ""))
                 return 201, asdict(system.add_schedule(sched))
             if m := re.fullmatch(r"/schedules/(\w+)/run", path):

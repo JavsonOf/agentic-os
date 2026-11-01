@@ -22,6 +22,14 @@ def _installed(module: str) -> bool:
         return False
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.environ.get(name, "").strip()
+    try:
+        return max(1, int(value)) if value else default
+    except ValueError:
+        raise ValueError(f"{name} must be a whole number, got {value!r}") from None
+
+
 @dataclass
 class Settings:
     """Configuration for an :class:`~agentic_os.kernel.AgenticOS` instance.
@@ -42,9 +50,13 @@ class Settings:
     model: str = field(default_factory=lambda: os.environ.get("AGENTIC_OS_MODEL", "claude-opus-5-5"))
     effort: str = field(default_factory=lambda: os.environ.get("AGENTIC_OS_EFFORT", "high"))
     fallbacks: bool = field(default_factory=lambda: _env_bool("AGENTIC_OS_FALLBACKS", True))
-    max_steps: int = field(default_factory=lambda: int(os.environ.get("AGENTIC_OS_MAX_STEPS", "10")))
+    max_steps: int = field(default_factory=lambda: _env_int("AGENTIC_OS_MAX_STEPS", 10))
     data_dir: str | None = field(default_factory=lambda: os.environ.get("AGENTIC_OS_DATA_DIR"))
     api_key: str | None = field(default_factory=lambda: os.environ.get("AGENTIC_OS_API_KEY"))
+
+    def __post_init__(self) -> None:
+        # Spaces or a newline pasted with the password (e.g. from a .env file) would otherwise lock everyone out.
+        self.api_key = (self.api_key or "").strip() or None
 
     def resolved_provider(self) -> str:
         """Pick a concrete provider for ``auto``: Claude, then Gemini, when credentials exist."""

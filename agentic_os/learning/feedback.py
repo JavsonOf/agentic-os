@@ -9,6 +9,8 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from agentic_os.storage import read_jsonl
+
 
 @dataclass
 class Feedback:
@@ -28,9 +30,7 @@ class FeedbackStore:
         self.path = path
         self.items: list[Feedback] = []
         self._lock = threading.Lock()
-        if path and os.path.exists(path):
-            with open(path, encoding="utf-8") as fh:
-                self.items = [Feedback(**json.loads(line)) for line in fh if line.strip()]
+        self.items = [Feedback(**item) for item in read_jsonl(path) if isinstance(item, dict)]
 
     def add(self, run_id: str, reward: float, arm: str | None = None, comment: str = "", source: str = "human", **metadata: Any) -> Feedback:
         if not -1.0 <= reward <= 1.0:

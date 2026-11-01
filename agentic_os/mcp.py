@@ -124,10 +124,20 @@ class _HttpTransport:
         pass
 
 
+# Server secrets (provider keys, the War Room password, GitHub tokens) live in the environment. An MCP program
+# gets only what it needs to run, plus the variables configured for it, instead of every secret.
+_SECRET_NAME = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH|COOKIE|SESSION", re.IGNORECASE)
+
+
+def child_env() -> dict[str, str]:
+    """The server's environment without anything that looks like a secret."""
+    return {k: v for k, v in os.environ.items() if not _SECRET_NAME.search(k)}
+
+
 class _StdioTransport:
     def __init__(self, cfg: MCPServerConfig, timeout: float) -> None:
         self.timeout = timeout
-        env = {**os.environ, **cfg.env}
+        env = {**child_env(), **cfg.env}
         try:
             self.proc = subprocess.Popen(
                 shlex.split(cfg.command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,

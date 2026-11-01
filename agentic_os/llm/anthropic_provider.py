@@ -69,12 +69,18 @@ class AnthropicProvider(LLMProvider):
         if self.effort:
             params["output_config"] = {"effort": self.effort}
 
-        if self.fallbacks:
-            response = self.client.beta.messages.create(
-                **params, betas=[FALLBACK_BETA], fallbacks="default"
-            )
-        else:
-            response = self.client.messages.create(**params)
+        try:
+            if self.fallbacks:
+                response = self.client.beta.messages.create(
+                    **params, betas=[FALLBACK_BETA], fallbacks="default"
+                )
+            else:
+                response = self.client.messages.create(**params)
+        except Exception as exc:
+            if type(exc).__module__.split(".")[0] != "anthropic":
+                raise
+            # SDK errors (bad key, rate limit, invalid request) become LLMError so callers handle them as such.
+            raise LLMError(f"Anthropic API error: {type(exc).__name__}: {exc}") from exc
         return from_anthropic_response(response)
 
 
@@ -105,7 +111,7 @@ def to_anthropic_messages(messages: list[Message]) -> list[dict[str, Any]]:
                 block["is_error"] = True
             push("user", [block])
         elif msg.role == "assistant":
-            if msg.raw is not None:
+            if isinstance(msg.raw, list):  # our own raw blocks; another provider's raw is rebuilt below
                 push("assistant", list(msg.raw))
                 continue
             blocks: list[Any] = []

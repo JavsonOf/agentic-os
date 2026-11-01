@@ -17,6 +17,7 @@ from typing import Any
 
 from agentic_os.llm.base import LLMError, LLMProvider
 from agentic_os.net import same_site
+from agentic_os.storage import read_json, write_json
 
 KINDS = ("anthropic", "gemini", "openai_compat")
 
@@ -76,10 +77,8 @@ class ProviderRegistry:
         self.path = path
         self._lock = threading.Lock()
         self._items: dict[str, ProviderConfig] = {}
-        if path and os.path.exists(path):
-            with open(path, encoding="utf-8") as fh:
-                for item in json.load(fh):
-                    self._items[item["id"]] = ProviderConfig(**item)
+        for item in read_json(path, []):
+            self._items[item["id"]] = ProviderConfig(**item)
         # requests made today and the last "Testuj" result per provider (no secrets, so a plain file)
         self._usage_path = os.path.join(os.path.dirname(os.path.abspath(path)), "usage.json") if path else None
         self._usage: dict[str, dict[str, Any]] = {}
@@ -120,11 +119,7 @@ class ProviderRegistry:
     def _save(self) -> None:
         if not self.path:
             return
-        os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-        fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump([asdict(p) for p in self._items.values()], fh)
-        os.chmod(self.path, 0o600)
+        write_json(self.path, [asdict(p) for p in self._items.values()])
 
     def upsert(self, config: ProviderConfig, keep_existing_key: bool = True) -> ProviderConfig:
         if not _ID.fullmatch(config.id):
