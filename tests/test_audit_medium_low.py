@@ -255,3 +255,23 @@ def test_editing_a_message_forgets_the_later_exchanges():
         httpd.shutdown()
         httpd.server_close()
         system.shutdown()
+
+
+def test_removing_the_default_provider_falls_back_to_the_settings_model(tmp_path):
+    system = AgenticOS(Settings(provider="mock", data_dir=str(tmp_path)))
+    try:
+        base = system.llm
+        system.providers.upsert(ProviderConfig("p1", "openai_compat", api_key="k", base_url="https://api.example/v1",
+                                               default_model="m"))
+        system.set_default_model("p1", "m")
+        assert system.llm is not base and system.prefs["default_provider"] == "p1"
+        assert system.remove_provider("p1")
+        assert system.llm is base and "default_provider" not in system.prefs
+        assert system.agents["assistant"].llm is base
+    finally:
+        system.shutdown()
+    again = AgenticOS(Settings(provider="mock", data_dir=str(tmp_path)))  # the removal is remembered after a restart
+    try:
+        assert "default_provider" not in again.prefs
+    finally:
+        again.shutdown()

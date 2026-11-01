@@ -541,7 +541,78 @@ const QUICK = {
   import: () => { showTab("brain"); openDetails("mem-import-card"); },
 };
 document.querySelectorAll("[data-quick]").forEach((b) => b.addEventListener("click", () => QUICK[b.dataset.quick]()));
-$("#offline-fix").addEventListener("click", () => showTab("models"));
+$("#offline-fix").addEventListener("click", () => connectWizard());
+/* "Połącz AI w 60 sekund": the one step that turns the offline demo into a working agent, as a guided 3-step sheet
+   (choose → get a key → connected) instead of the full provider form. The key goes straight to this server. */
+const QUICK_PROVIDERS = [
+  { id: "gemini", name: "Google Gemini", badge: "Darmowy · zalecany", tone: "soft", url: "https://aistudio.google.com/apikey", prefix: "AIza",
+    how: "Zaloguj się kontem Google i kliknij „Create API key”. Darmowy plan wystarczy na codzienną pracę." },
+  { id: "openrouter", name: "OpenRouter", badge: "Darmowe modele", tone: "gray", url: "https://openrouter.ai/keys", prefix: "sk-or-",
+    how: "Załóż konto i kliknij „Create Key”. Z darmowymi modelami nie potrzeba karty." },
+  { id: "anthropic", name: "Anthropic Claude", badge: "Płatny · najmocniejszy", tone: "amber", url: "https://console.anthropic.com/settings/keys", prefix: "sk-ant-",
+    how: "Zaloguj się, doładuj konto i kliknij „Create Key”." },
+];
+function connectWizard() {
+  const choose = () => openSheet("Połącz AI w 60 sekund",
+    el("p", { class: "muted", text: "Bez modelu AI agent działa w trybie offline i nie rozumie pytań. Wybierz dostawcę – zajmie to minutę." }),
+    el("div", { class: "wiz-list" }, ...QUICK_PROVIDERS.map((q) => el("button", { type: "button", class: "wiz-choice", onclick: () => keyStep(q) },
+      el("span", { class: "tile " + q.tone }, icon("spark", 20)),
+      el("span", { class: "today-text" }, el("b", { text: q.name }), el("small", { text: q.badge })), icon("chevRight", 18)))),
+    el("button", { type: "button", class: "btn ghost btn-wide", text: "Inny dostawca (OpenAI, Groq, Ollama…)",
+      onclick: () => { closeSheet(); showTab("models"); } }));
+  const keyStep = (q) => {
+    const preset = (state.presets || []).find((x) => x.id === q.id) || { id: q.id, kind: q.id === "openrouter" ? "openai_compat" : q.id };
+    const input = el("input", { type: "password", autocomplete: "off", placeholder: `${q.prefix}…`, "aria-label": `Klucz API ${q.name}` });
+    const hint = el("p", { class: "small muted", "aria-live": "polite" });
+    const go = el("button", { type: "submit", class: "btn primary btn-wide", text: "Połącz" });
+    const check = () => {
+      const v = input.value.trim();
+      hint.textContent = v && !v.startsWith(q.prefix) ? `Klucze ${q.name} zwykle zaczynają się od „${q.prefix}”. Sprawdź, czy skopiowałeś cały klucz.` : "";
+    };
+    input.addEventListener("input", check);
+    const paste = el("button", { type: "button", class: "btn small", text: "Wklej", onclick: async () => {
+      try { input.value = (await navigator.clipboard.readText()).trim(); check(); } catch { input.focus(); toast("Przytrzymaj pole i wybierz „Wklej”."); }
+    } });
+    const form = el("form", { class: "stack" },
+      el("ol", { class: "wiz-steps" },
+        el("li", {}, el("b", { text: "Otwórz stronę z kluczami. " }), q.how, " ",
+          el("a", { href: q.url, target: "_blank", rel: "noopener", class: "wiz-link", text: "Otwórz " + new URL(q.url).host + " ↗" })),
+        el("li", {}, el("b", { text: "Skopiuj klucz i wklej go tutaj." }))),
+      el("div", { class: "wiz-key" }, input, paste), hint, go,
+      el("button", { type: "button", class: "btn ghost btn-wide", text: "← Inny dostawca", onclick: choose }),
+      el("p", { class: "small muted", text: "Klucz trafia tylko na Twój serwer Agentic OS. Możesz go zmienić w zakładce Modele." }));
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = input.value.trim(); if (!key) { input.focus(); return; }
+      go.disabled = true; go.textContent = "Łączę…";
+      const existed = (state.providers || []).some((x) => x.id === preset.id);
+      try {
+        await api("/providers", { method: "POST", body: { id: preset.id, kind: preset.kind, api_key: key, base_url: preset.base_url || "",
+          default_model: preset.default_model || "", label: preset.label || q.name, make_default: true } });
+        const r = await api(`/providers/${preset.id}/test`, { method: "POST", body: {} });
+        await refreshProviders();
+        done(q, r.model);
+      } catch (err) {
+        go.disabled = false; go.textContent = "Spróbuj ponownie";
+        const why = explainError(err.message) || err.message;
+        hint.textContent = why.startsWith("🔑") ? "🔑 Ten klucz nie działa. Sprawdź, czy skopiowałeś go w całości, i wklej ponownie." : why;
+        // A key that failed the test must not leave a "connected" provider behind (the app would look online but not answer).
+        if (!existed) { try { await api(`/providers/${preset.id}`, { method: "DELETE" }); } catch { /* already gone */ } }
+        refreshProviders().catch(() => {});
+      }
+    });
+    openSheet(q.name, form);
+    setTimeout(() => input.focus(), 50);
+  };
+  const done = (q, model) => openSheet("Gotowe! 🎉",
+    el("div", { class: "wiz-done" }, el("span", { class: "tile soft" }, icon("check", 26)),
+      el("p", {}, el("b", { text: `${q.name} jest połączony.` }), ` Agent rozumie Cię teraz naprawdę${model ? ` (model: ${model})` : ""}.`)),
+    el("button", { type: "button", class: "btn primary btn-wide", text: "Zadaj pierwsze pytanie", onclick: () => {
+      closeSheet(); showTab("chat"); loadStart();
+      const t = $("#start-text"); t.value = "Co potrafisz? Pokaż mi 3 rzeczy, w których możesz mi dziś pomóc."; t.focus();
+    } }));
+  choose();
+}
 /* Voice input (Web Speech API); the mic button only appears where the browser supports it. */
 (function setupMic() {
   const btn = $("#start-mic");
@@ -1372,8 +1443,8 @@ async function loadModels() {
   } else {
     cards.push(el("section", { class: "prov-main" }, el("div", { class: "prov-top" }, el("span", { class: "tile amber" }, icon("spark")),
       el("div", { class: "prov-name" }, el("strong", { text: "Brak modelu AI" }), el("span", { text: "Agenci nie rozumieją pytań, dopóki nie dodasz klucza." }))),
-    el("div", { class: "two-btns" }, el("button", { type: "button", class: "yes", style: "grid-column:1/-1", text: "Dodaj klucz Gemini (darmowy)",
-      onclick: () => fillProviderForm(data.presets.find((x) => x.id === "gemini") || data.presets[0], true) }))));
+    el("div", { class: "two-btns" }, el("button", { type: "button", class: "yes", style: "grid-column:1/-1", text: "Połącz AI w 60 sekund",
+      onclick: () => connectWizard() }))));
   }
   for (const p of data.providers) if (p !== main) cards.push(providerRow(p));
   for (const id of POPULAR) {
