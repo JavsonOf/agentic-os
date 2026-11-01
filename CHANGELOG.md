@@ -46,7 +46,22 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Message Editing, Agent Screen and Token Usage Counter
+Tytuł: Today Feed on the Start Screen
+
+### Dodano
+- Sekcja „Na dziś” na ekranie startowym: od razu widać, co wymaga uwagi i co agenci zrobili, gdy Cię nie było.
+  - Decyzje, na które czekają agenci, są na samej górze i prowadzą prosto do rozmowy z agentem.
+  - Wyniki zaplanowanych zadań z ostatniej doby („Poranne podsumowanie – gotowe”) z fragmentem odpowiedzi. Znikają z listy, gdy je otworzysz.
+  - „Kontynuuj rozmowę” z ostatnim agentem i fragmentem jego ostatniej odpowiedzi.
+  - Najbliższe zaplanowane zadanie, np. „jutro o 07:30”.
+  - Gdy nie masz jeszcze zaplanowanych zadań: propozycja „Niech agent pracuje, gdy śpisz”, która otwiera gotowy do zapisania formularz porannego podsumowania.
+  - Sekcja nie wysyła nic do modelu AI, więc nie zużywa tokenów.
+
+### Ulepszono
+- Pole „Napisz do agenta…” na ekranie startowym jest zawsze widoczne nad dolnym menu, także gdy ekran trzeba przewinąć.
+
+## v0.5.0 – Message Editing, Agent Screen and Token Usage Counter
+_01.11.2026_
 
 ### Dodano
 - Edycja wysłanej wiadomości w czacie, jak w innych aplikacjach AI.

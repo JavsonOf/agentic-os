@@ -39,6 +39,9 @@ const ICONS = {
   spark: '<path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/>',
   wave: '<path d="M4 12h5l3-7 3 14 3-7h2"/>',
   chevDown: '<path d="M6 9l6 6 6-6"/>',
+  chevRight: '<path d="M9 6l6 6-6 6"/>',
+  chat: '<path d="M4 5h16v11H9l-5 4z"/>',
+  alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/>',
 };
 function icon(name, size = 20) {
   const wrap = document.createElement("span");
@@ -449,7 +452,81 @@ function loadStart() {
   const h = new Date().getHours();
   $("#hello-greeting").textContent = h >= 18 || h < 5 ? "Dobry wieczór" : "Dzień dobry";
   renderAgentCards();
-  Promise.all([refreshAgents(), refreshProviders()]).then(renderAgentCards).catch(() => {});
+  Promise.all([refreshAgents(), refreshProviders()]).then(() => { renderAgentCards(); loadToday(); }).catch(() => {});
+}
+/* "Na dziś": the start screen as a home feed – what waits for you, what your agents did while you were away,
+   where you left off and what runs next. Built from data the app already has; no model calls, no tokens. */
+const SEEN_RESULTS = "aos_seen_results";
+function seenResults() { try { return new Set(JSON.parse(store.get(SEEN_RESULTS, "[]"))); } catch { return new Set(); } }
+function markSeen(pid) { const s = seenResults(); s.add(pid); store.set(SEEN_RESULTS, JSON.stringify([...s].slice(-200))); }
+function whenLabel(d, time) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const inDays = Math.round((new Date(d).setHours(0, 0, 0, 0) - today) / 864e5);
+  const day = inDays === 0 ? "dziś" : inDays === 1 ? "jutro" : d.toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long" });
+  return `${day} o ${time}`;
+}
+function lastConversation() {
+  let best = null;
+  for (const a of state.agents) {
+    if (!store.get("aos_session_" + a.name)) continue; // never chatted: don't create a session just to look
+    const entries = loadChat(a.name).filter((e) => e.at);
+    const last = entries[entries.length - 1];
+    if (!last || Date.now() - last.at > 3 * 864e5 || (best && best.at > last.at)) continue;
+    const reply = [...entries].reverse().find((e) => e.role === "agent" && e.done && e.done.result && e.done.result.output);
+    const said = [...entries].reverse().find((e) => e.role === "user");
+    best = { agent: a.name, at: last.at, text: reply ? reply.done.result.output : said ? "Ty: " + said.text : "" };
+  }
+  return best;
+}
+function todayItem(iconName, tone, title, sub, onclick, extra = "") {
+  return el("button", { type: "button", class: "today-item " + extra, onclick },
+    el("span", { class: "tile " + tone }, icon(iconName, 20)),
+    el("span", { class: "today-text" }, el("b", { text: title }), sub ? el("small", { text: sub }) : null),
+    icon("chevRight", 18));
+}
+async function loadToday() {
+  let processes = []; let schedules = [];
+  try { [{ processes }, { schedules }] = await Promise.all([api("/processes"), api("/schedules")]); } catch { return; }
+  state.schedules = schedules;
+  const items = [];
+  const waiting = state.approvals || [];
+  if (waiting.length) {
+    items.push(todayItem("alert", "amber", `${countOf(waiting.length, "decyzja czeka", "decyzje czekają", "decyzji czeka")} na Ciebie`,
+      `Agent ${waiting[0].agent} potrzebuje Twojej zgody albo odpowiedzi`, () => { selectAgent(waiting[0].agent); showTab("convo"); }, "urgent"));
+  }
+  const seen = seenResults();
+  const fresh = processes.filter((p) => ["completed", "failed"].includes(p.status) && !seen.has(p.pid)
+    && p.finished_at && Date.now() / 1000 - p.finished_at < 864e2 && schedules.some((s) => s.last_pid === p.pid));
+  for (const p of fresh.slice(0, 2)) {
+    const s = schedules.find((x) => x.last_pid === p.pid);
+    const name = s.title || String(s.task).split("\n")[0].slice(0, 60);
+    const ok = p.status === "completed";
+    const out = ok ? String((p.result && p.result.output) || "").replace(/\s+/g, " ").slice(0, 110) : "Dotknij, żeby zobaczyć, co poszło nie tak";
+    items.push(todayItem(ok ? "check" : "alert", ok ? "soft" : "amber", `${name} – ${ok ? "gotowe" : "nie udało się"} · ${fmtTime(p.finished_at * 1000)}`,
+      out, () => { markSeen(p.pid); showTab("tasks"); openTask(p.pid); }));
+  }
+  const convo = lastConversation();
+  if (convo) {
+    items.push(todayItem("chat", "soft", `Kontynuuj rozmowę z ${convo.agent}`, convo.text.replace(/\s+/g, " ").slice(0, 110),
+      () => { selectAgent(convo.agent); showTab("convo"); }));
+  }
+  const upcoming = schedules.filter((s) => s.enabled).map((s) => ({ s, d: nextRun(s.time, s.days) })).filter((x) => x.d).sort((a, b) => a.d - b.d)[0];
+  if (upcoming) {
+    items.push(todayItem("clock", "gray", `${upcoming.s.title || "Zaplanowane zadanie"} – ${whenLabel(upcoming.d, upcoming.s.time)}`,
+      `Wykona ${upcoming.s.agent}, także gdy aplikacja jest zamknięta`, () => showTab("tasks")));
+  } else if (!schedules.length) {
+    // The feature that makes agents work for you while you sleep, offered ready to save.
+    items.push(todayItem("spark", "soft", "Niech agent pracuje, gdy śpisz",
+      "Zaplanuj poranne podsumowanie: codziennie o 07:30, gotowe na start dnia", () => {
+        showTab("tasks"); editSchedule(null);
+        const E = $("#schedule-form").elements;
+        E.title.value = "Poranne podsumowanie";
+        E.task.value = "Podsumuj moje notatki, zadania i to, co ważne na dziś, w kilku punktach.";
+        showNextRun();
+      }));
+  }
+  $("#today-list").replaceChildren(...items.slice(0, 4));
+  $("#today").classList.toggle("hidden", !items.length);
 }
 $("#start-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -786,6 +863,7 @@ function renderApprovals(list, force = false) {
   const key = `${state.tab}|${currentAgent()}|${list.map((a) => a.id).join(",")}`;
   if (key === state.approvalKey && !force) return; // keep a half-typed answer intact between polls
   state.approvalKey = key;
+  if (state.tab === "chat") loadToday(); // the "Na dziś" feed shows waiting decisions too
   chatLog.querySelectorAll(".ask-card").forEach((n) => { if (!inline.some((a) => a.id === n.dataset.ask)) n.remove(); });
   for (const a of inline) if (!chatLog.querySelector(`[data-ask="${a.id}"]`)) { chatLog.append(approvalCard(a, false)); chatLog.scrollTop = chatLog.scrollHeight; }
   const box = $("#approvals");
@@ -1085,10 +1163,7 @@ function showNextRun() {
   const E = $("#schedule-form").elements; const out = $("#schedule-next");
   const d = nextRun(E.time.value, E.days.value);
   if (!d) { out.textContent = ""; return; }
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const inDays = Math.round((new Date(d).setHours(0, 0, 0, 0) - today) / 864e5);
-  const day = inDays === 0 ? "dziś" : inDays === 1 ? "jutro" : d.toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long" });
-  out.textContent = `⏰ Następne uruchomienie: ${day} o ${E.time.value}`;
+  out.textContent = `⏰ Następne uruchomienie: ${whenLabel(d, E.time.value)}`;
 }
 $("#schedule-form").elements.time.addEventListener("input", showNextRun);
 $("#schedule-form").elements.days.addEventListener("change", showNextRun);
