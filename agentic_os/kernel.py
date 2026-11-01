@@ -921,6 +921,11 @@ class AgenticOS:
     def reset_chat(self, agent: str = "assistant", session: str = "default") -> None:
         self._sessions.pop((agent, session), None)
 
+    def rewind_chat(self, agent: str, session: str, turns: int) -> int:
+        """Drop the last ``turns`` exchanges of a chat, so an edited message replaces them."""
+        buffer = self._sessions.get((agent, session))
+        return buffer.rewind(turns) if buffer is not None else 0
+
     def wait(self, pid: str, timeout: float | None = None) -> Process:
         proc = self.process(pid)
         if proc._future is not None:

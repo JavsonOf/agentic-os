@@ -216,3 +216,42 @@ def test_usage_counts_requests_and_tokens_per_day_and_provider(tmp_path, monkeyp
         httpd.shutdown()
         httpd.server_close()
         system.shutdown()
+
+
+def test_editing_a_message_forgets_the_later_exchanges():
+    from agentic_os.llm.base import Message
+    from agentic_os.memory.short_term import ConversationBuffer
+
+    buffer = ConversationBuffer()
+    for n in range(3):
+        buffer.add_turn([Message.user(f"pytanie {n}"), Message.assistant(f"odpowiedź {n}")])
+    assert buffer.rewind(2) == 2 and [m.content for m in buffer.messages()] == ["pytanie 0", "odpowiedź 0"]
+    assert buffer.rewind(5) == 1 and buffer.messages() == [] and buffer.rewind(1) == 0
+
+    system = AgenticOS(Settings(provider="mock"))
+    system.chat("pierwsze", session="s1")
+    system.chat("drugie", session="s1")
+    httpd = make_server(system, port=0)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+    def rewind(body):
+        req = urllib.request.Request(base + "/chat/rewind", data=json.dumps(body).encode(), method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as err:
+            return err.code, None
+
+    try:
+        assert rewind({"agent": "assistant", "session": "s1", "turns": 1}) == (200, {"removed": 1})
+        left = system._sessions[("assistant", "s1")].messages()
+        assert left[0].content == "pierwsze" and all("drugie" not in m.content for m in left)
+        assert rewind({"session": "nobody", "turns": 3}) == (200, {"removed": 0})
+        for bad in (-1, True, "2", None):
+            assert rewind({"session": "s1", "turns": bad})[0] == 400
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        system.shutdown()

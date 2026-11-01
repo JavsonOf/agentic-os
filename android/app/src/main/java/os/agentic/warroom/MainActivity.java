@@ -1,16 +1,21 @@
 package os.agentic.warroom;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.speech.RecognizerIntent;
 import android.text.InputType;
 import android.view.KeyEvent;
 import android.view.ViewGroup;
+import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -23,11 +28,15 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+
+import org.json.JSONObject;
+
 /**
  * Agentic OS for Android: the War Room in a full-screen WebView.
  *
  * The agents run on your own Agentic OS server (Oracle, Hetzner, OmGithub or Termux on this phone);
- * the app only stores that server's address. Hold the Back button to change it.
+ * the app only stores that server's address. Change it in Ty → Adres serwera (or hold the Back button).
  */
 public class MainActivity extends Activity {
 
@@ -35,9 +44,12 @@ public class MainActivity extends Activity {
     private static final String KEY_URL = "server_url";
     private static final String SETTINGS_LINK = "agentic-os://settings";
     private static final int FILE_CHOOSER_REQUEST = 1;
+    private static final int SPEECH_REQUEST = 2;
+    private static final int CAMERA_PERMISSION_REQUEST = 3;
 
     private WebView webView;
     private ValueCallback<Uri[]> pendingUpload;
+    private PermissionRequest pendingCamera;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +76,8 @@ public class MainActivity extends Activity {
         settings.setDomStorageEnabled(true); // the War Room keeps its login and chat sessions here
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setUserAgentString(settings.getUserAgentString() + " AgenticOSApp/1");
+        settings.setMediaPlaybackRequiresUserGesture(false); // the QR scanner's live camera preview
+        webView.addJavascriptInterface(new Bridge(), "AgenticOSAndroid");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -114,7 +128,92 @@ public class MainActivity extends Activity {
                 }
                 return true;
             }
+
+            // The War Room's live QR scanner asks for the camera; nothing else (and no other site) gets it.
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                boolean camera = false;
+                for (String resource : request.getResources()) {
+                    camera |= PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource);
+                }
+                if (!camera || !isServer(request.getOrigin())) {
+                    request.deny();
+                    return;
+                }
+                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(new String[] {PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    return;
+                }
+                if (pendingCamera != null) {
+                    pendingCamera.deny();
+                }
+                pendingCamera = request;
+                requestPermissions(new String[] {Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (request == pendingCamera) {
+                    pendingCamera = null;
+                }
+            }
         });
+    }
+
+    /** True for pages of the user's own server (the only pages the app keeps inside the WebView). */
+    private boolean isServer(Uri url) {
+        String host = Uri.parse(serverUrl()).getHost();
+        return url != null && host != null && host.equals(url.getHost());
+    }
+
+    /**
+     * What the War Room page can ask the app for. The WebView has no speech recognition of its own,
+     * so the mic button opens the system speech screen and gets the text back.
+     */
+    private final class Bridge {
+        @JavascriptInterface
+        public boolean canListen() {
+            return new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).resolveActivity(getPackageManager()) != null;
+        }
+
+        @JavascriptInterface
+        public void listen(String language) {
+            runOnUiThread(() -> {
+                String page = webView.getUrl();
+                if (page == null || !isServer(Uri.parse(page))) {
+                    return;
+                }
+                Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language == null || language.isEmpty() ? "pl-PL" : language)
+                        .putExtra(RecognizerIntent.EXTRA_PROMPT, "Mów, co agent ma zrobić");
+                try {
+                    startActivityForResult(intent, SPEECH_REQUEST);
+                } catch (ActivityNotFoundException e) {
+                    deliverSpeech(null);
+                    Toast.makeText(MainActivity.this, "Brak rozpoznawania mowy na tym telefonie", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+    }
+
+    private void deliverSpeech(String text) {
+        webView.evaluateJavascript("window.aosSpeechResult && window.aosSpeechResult("
+                + (text == null ? "null" : JSONObject.quote(text)) + ")", null);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        if (requestCode == CAMERA_PERMISSION_REQUEST && pendingCamera != null) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                pendingCamera.grant(new String[] {PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+            } else {
+                pendingCamera.deny();
+            }
+            pendingCamera = null;
+            return;
+        }
+        super.onRequestPermissionsResult(requestCode, permissions, results);
     }
 
     private String serverUrl() {
@@ -136,7 +235,7 @@ public class MainActivity extends Activity {
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Adres Twojego Agentic OS")
                 .setMessage("Wpisz adres serwera, na którym działa Agentic OS. "
-                        + "Adres możesz później zmienić, przytrzymując przycisk Wstecz.")
+                        + "Adres zmienisz później w zakładce Ty → Adres serwera.")
                 .setView(box)
                 .setCancelable(!firstRun)
                 .setPositiveButton("Połącz", null)
@@ -158,7 +257,7 @@ public class MainActivity extends Activity {
             webView.clearHistory();
             webView.loadUrl(url);
             if (firstRun) {
-                Toast.makeText(this, "Przytrzymaj Wstecz, aby zmienić adres serwera", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Adres serwera zmienisz w zakładce Ty", Toast.LENGTH_LONG).show();
             }
         }));
         dialog.show();
@@ -204,6 +303,12 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == SPEECH_REQUEST) {
+            ArrayList<String> heard = resultCode == RESULT_OK && data != null
+                    ? data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS) : null;
+            deliverSpeech(heard == null || heard.isEmpty() ? null : heard.get(0));
+            return;
+        }
         if (requestCode == FILE_CHOOSER_REQUEST && pendingUpload != null) {
             pendingUpload.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
             pendingUpload = null;
@@ -223,6 +328,7 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+        // Only with the 3-button navigation bar; with gesture navigation use Ty → Adres serwera.
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             askForServer(false);
             return true;

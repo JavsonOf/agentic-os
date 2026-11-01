@@ -37,6 +37,7 @@ POST     /agents/external                  ``{name, protocol, url, api_key?, mod
 DELETE   /agents/{name}                    remove an agent
 POST     /chat                             ``{message, agent?, session?, async?}`` multi-turn chat
 POST     /chat/reset                       ``{agent?, session?}``
+POST     /chat/rewind                      ``{agent?, session?, turns}`` forget the last exchanges (edit a message)
 POST     /crew                             ``{task, agents, process?}`` run a crew (async)
 GET      /knowledge                        ingested documents
 GET      /graph                            knowledge/memory graph for the Brain view
@@ -458,6 +459,12 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 proc = system.chat(message, agent=str(body.get("agent") or "assistant"),
                                    session=str(body.get("session") or "default"), wait=not body.get("async", True))
                 return (202 if body.get("async", True) else 200), proc.to_dict()
+            if path == "/chat/rewind":
+                turns = body.get("turns")
+                if not isinstance(turns, int) or isinstance(turns, bool) or turns < 0:
+                    raise HTTPError(400, "'turns' must be a whole number of exchanges to forget")
+                removed = system.rewind_chat(str(body.get("agent") or "assistant"), str(body.get("session") or "default"), turns)
+                return 200, {"removed": removed}
             if path == "/chat/reset":
                 system.reset_chat(str(body.get("agent") or "assistant"), str(body.get("session") or "default"))
                 return 200, {"ok": True}
