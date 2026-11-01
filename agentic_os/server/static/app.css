@@ -579,3 +579,9 @@ input.need { border-color: var(--warn-pill); }
 .reply-follow { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 2px; }
 .follow-chip { min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .follow-chip:hover, .follow-chip:focus-visible { border-color: var(--accent); color: var(--accent); }
+/* conversation history */
+.hist-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.hist-item { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); padding-right: 6px; }
+.hist-item:focus-within, .hist-item:hover { border-color: var(--accent); }
+.hist-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 6px 10px 12px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 18px; }
+.hist-item .reply-act { font-size: 15px; }

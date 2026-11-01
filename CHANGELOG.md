@@ -46,7 +46,20 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Reply Actions and One-Tap Follow-Ups
+Tytuł: Conversation History
+
+### Dodano
+- Historia rozmów w czacie, jak w innych aplikacjach AI: przycisk „Rozmowy” w nagłówku rozmowy.
+  - Lista poprzednich rozmów z agentem: tytuł z pierwszego pytania, dzień, godzina i liczba wiadomości.
+  - Dotknięcie rozmowy otwiera ją z powrotem. Agent pamięta jej przebieg, dopóki serwer nie został uruchomiony ponownie.
+  - Przy każdej rozmowie jest „✕”, żeby usunąć ją z historii.
+  - Historia trzyma 20 ostatnich rozmów z każdym agentem, w tej przeglądarce lub aplikacji.
+
+### Zmieniono
+- „Nowa rozmowa” nie kasuje już poprzedniej rozmowy, tylko odkłada ją do historii.
+
+## v0.8.0 – Reply Actions and One-Tap Follow-Ups
+_01.11.2026_
 
 ### Dodano
 - Akcje pod każdą odpowiedzią agenta w czacie: odpowiedź nie kończy już rozmowy.

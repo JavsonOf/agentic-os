@@ -679,12 +679,67 @@ $("#convo-settings").addEventListener("click", () => {
 $("#chat-agent").addEventListener("change", (e) => { selectAgent(e.target.value); renderConvoHead(); renderChat(); });
 $("#chat-permission").addEventListener("change", (e) => changeAgent(currentAgent(), { permission: e.target.value }, e.target));
 $("#chat-mode").addEventListener("change", (e) => changeAgent(currentAgent(), { mode: e.target.value }, e.target));
-$("#chat-reset").addEventListener("click", async () => {
+$("#chat-reset").addEventListener("click", () => { newConversation(); $("#convo-sheet").classList.add("hidden"); });
+$("#convo-history").addEventListener("click", () => openHistory());
+/* Conversation history, like in other AI apps: "Nowa rozmowa" keeps the old one instead of erasing it, and an
+   archived conversation reopens with one tap. The server remembers each session until it restarts. */
+const HISTORY_KEEP = 20;
+function historyKey(agent) { return "aos_chats_" + agent; }
+function loadHistory(agent) { try { return JSON.parse(store.get(historyKey(agent), "[]")) || []; } catch { return []; } }
+function saveHistory(agent, list) {
+  for (const old of list.slice(HISTORY_KEEP)) store.del(`aos_chat_${agent}_${old.session}`); // oldest ones go for good
+  store.set(historyKey(agent), JSON.stringify(list.slice(0, HISTORY_KEEP)));
+}
+function conversationTitle(entries) {
+  const first = entries.find((e) => e.role === "user");
+  const t = first ? first.text.replace(/\s+/g, " ").trim() : "Rozmowa";
+  return t.length > 70 ? t.slice(0, 67) + "…" : t;
+}
+/* Put the open conversation (if it has anything) on top of the history list. */
+function archiveCurrent(agent) {
+  const session = store.get("aos_session_" + agent);
+  if (!session) return;
+  const entries = loadChat(agent);
+  const list = loadHistory(agent).filter((c) => c.session !== session);
+  if (entries.some((e) => e.role === "user")) {
+    const last = entries.filter((e) => e.at).pop();
+    list.unshift({ session, title: conversationTitle(entries), at: last ? last.at : Date.now(), count: entries.filter((e) => e.role === "user").length });
+  }
+  saveHistory(agent, list);
+}
+function newConversation() {
   const agent = currentAgent();
-  try { await api("/chat/reset", { method: "POST", body: { agent, session: sessionId(agent) } }); } catch { /* ignore */ }
-  store.del(chatKey(agent)); store.del("aos_session_" + agent); renderChat(); toast("Nowa rozmowa");
-  $("#convo-sheet").classList.add("hidden");
-});
+  archiveCurrent(agent);
+  store.del("aos_session_" + agent); // the next message starts a fresh session; the old one stays on the server
+  renderChat(); toast("Nowa rozmowa – poprzednia jest w historii");
+  setTimeout(() => $("#chat-text").focus(), 50);
+}
+function openConversation(agent, session) {
+  archiveCurrent(agent);
+  saveHistory(agent, loadHistory(agent).filter((c) => c.session !== session));
+  store.set("aos_session_" + agent, session);
+  closeSheet(); renderChat();
+}
+function openHistory() {
+  const agent = currentAgent();
+  const list = loadHistory(agent);
+  const item = (c) => el("div", { class: "hist-item" },
+    el("button", { type: "button", class: "hist-open", onclick: () => openConversation(agent, c.session) },
+      el("span", { class: "tile soft" }, icon("chat", 18)),
+      el("span", { class: "today-text" }, el("b", { text: c.title }),
+        el("small", { text: `${dayLabel(c.at)} · ${countOf(c.count, "wiadomość", "wiadomości", "wiadomości")}` }))),
+    el("button", { type: "button", class: "reply-act", "aria-label": `Usuń rozmowę: ${c.title}`, title: "Usuń", onclick: () => {
+      if (!confirm("Usunąć tę rozmowę z historii?")) return;
+      store.del(`aos_chat_${agent}_${c.session}`);
+      saveHistory(agent, loadHistory(agent).filter((x) => x.session !== c.session));
+      api("/chat/reset", { method: "POST", body: { agent, session: c.session } }).catch(() => {});
+      openHistory();
+    } }, "✕"));
+  openSheet(`Rozmowy z ${agent}`,
+    el("button", { type: "button", class: "btn primary btn-wide", onclick: () => { closeSheet(); newConversation(); } }, icon("plus", 18), " Nowa rozmowa"),
+    list.length ? el("div", { class: "hist-list" }, ...list.map(item))
+      : el("p", { class: "muted", text: "Tu pojawią się Twoje poprzednie rozmowy. „Nowa rozmowa” zachowuje obecną, zamiast ją kasować." }));
+}
 
 function addMsg(role, text) {
   $(".empty", chatLog)?.remove();
