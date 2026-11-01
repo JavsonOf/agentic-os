@@ -216,9 +216,8 @@
         <section class="card stack" aria-labelledby="agent-screen-skills-title">
           <h3 id="agent-screen-skills-title" class="card-title">Skille</h3>
           <div id="agent-screen-skills" class="chips" role="group" aria-labelledby="agent-screen-skills-title"></div>
-          <p class="muted small" id="agent-screen-hint">Dotknij skilla, żeby go włączyć albo wyłączyć.</p>
+          <p class="muted small" id="agent-screen-hint">Dotknij skilla, żeby go włączyć albo wyłączyć – zapisuje się od razu. Przytrzymaj, żeby zobaczyć, co robi.</p>
         </section>
-        <button class="btn primary btn-wide" id="agent-screen-save" type="button">Zapisz agenta</button>
       </section>
 
 
@@ -244,6 +243,7 @@
               <select name="days"><option value="daily">Codziennie</option><option value="weekdays">W dni robocze</option><option value="weekends">W weekendy</option></select>
             </label>
           </div>
+          <p class="muted small" id="schedule-next" aria-live="polite"></p>
           <label class="field"><span>Agent</span><select name="agent" id="schedule-agent"></select></label>
           <div class="row">
             <button class="btn primary" type="submit">Zapisz</button>
@@ -411,6 +411,7 @@
             </div>
             <label class="field"><span>Adres API (base URL)</span><input name="base_url" placeholder="https://…/v1"></label>
             <label class="field"><span>Klucz API</span><input name="api_key" type="password" autocomplete="off" placeholder="zostaw puste, żeby nie zmieniać"></label>
+            <p class="key-hint small hidden" id="provider-key-hint">Zmieniasz adres API – wpisz klucz jeszcze raz. Zapisany klucz nie zostanie wysłany pod nowy adres.</p>
             <label class="field"><span>Domyślny model</span><input name="default_model" placeholder="np. gemini-flash-latest"></label>
             <label class="field"><span>Dzienny limit zapytań (opcjonalnie, np. 20 na darmowym planie)</span><input name="daily_limit" type="number" min="0" step="1" inputmode="numeric" placeholder="brak"></label>
             <label class="check"><input type="checkbox" name="make_default"> Ustaw jako domyślny model systemu</label>
@@ -516,6 +517,7 @@
       </div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="snackbar" class="snackbar" role="status" aria-live="polite"><span id="snackbar-text"></span><button type="button" id="snackbar-undo">Cofnij</button></div>
   </div>
   <script src="/errors.js"></script>
   <script src="/qr.js"></script>
