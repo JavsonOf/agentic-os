@@ -14,6 +14,7 @@ ERRORS_JS = Path(__file__).resolve().parent.parent / "agentic_os" / "server" / "
 CASES = [
     ('Brak połączenia z serwerem', 'Brak połączenia'),
     ('Missing or invalid API key', 'hasło'),
+    ('Stopped by the user', 'Zatrzymałeś'),
     ('No route for GET /providers/x/models', 'starszą wersję'),
     ('Request body too large', 'za duży'),
     ('Invalid JSON: Expecting value', 'niepoprawne dane'),

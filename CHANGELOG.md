@@ -46,6 +46,18 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
+Tytuł: Stop and Regenerate Replies
+
+### Dodano
+- Przycisk „Zatrzymaj” w czacie, gdy agent pracuje nad odpowiedzią.
+  - Agent naprawdę przestaje pracować na serwerze: nie wykonuje kolejnych kroków i nie zużywa już tokenów.
+  - Gdy agent czekał na Twoją zgodę, zatrzymanie odpowiada „nie” i kończy zadanie.
+  - Zatrzymana odpowiedź ma przycisk „Spróbuj ponownie”, a w zakładce Zadania jest oznaczona jako „zatrzymane”.
+- „Wygeneruj ponownie” pod ostatnią odpowiedzią agenta: inna odpowiedź na to samo pytanie bez przepisywania go. Poprzednia odpowiedź znika też z pamięci agenta.
+
+### Naprawiono
+- Odpowiedź, która zakończyła się błędem, ma pod spodem przycisk „Spróbuj ponownie”.
+
 ### Drobne zmiany
 - Skill `/scal-i-sprawdz` dla Claude Code w repozytorium (`.claude/skills/`): scala PR, gdy testy są zielone, a potem po kolei sprawdza opisy wydań i nowe wydanie.
 
