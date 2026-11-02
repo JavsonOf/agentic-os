@@ -1,8 +1,8 @@
 name: release-notes
 
 # Keeps GitHub releases in line with CHANGELOG.md: releases published before SemVer move to their
-# vX.Y.Z tag ("dawniej android-N" lines), APKs are named AgenticOS_vX.Y.Z.apk, and every release gets its
-# title and notes from its section.
+# vX.Y.Z tag ("dawniej android-N" lines), renumbered releases move to their new number ("przenumerowane z vA.B.C"),
+# APKs are named AgenticOS_vX.Y.Z.apk, and every release gets its title and notes from its section.
 on:
   push:
     branches: [main]
@@ -40,13 +40,45 @@ jobs:
               echo "Deleted old tag $old"
             fi
           done
+      - name: Move renumbered releases to their new numbers
+        run: |
+          # "przenumerowane z vA.B.C" lines. New numbers can belong to other releases right now (v0.9.0 -> v0.7.0 while
+          # v0.7.0 -> v0.6.1), so every release first moves to a temporary "renumber-<new>" tag and only then to <new>.
+          # A release is moved only while it still has its old tag AND its old title, so running this again later
+          # never touches a release that now legitimately uses an old number.
+          repo="${{ github.repository }}"
+          python3 scripts/release_notes.py --renumbers > renumbers.txt
+          gh api "repos/$repo/releases?per_page=100" --jq '.[] | [.id, .tag_name, .name] | @tsv' > releases.tsv
+          while read -r old new; do
+            [ -n "$old" ] || continue
+            title="$old – $(python3 scripts/release_notes.py --title "$new")"
+            id=$(awk -F'\t' -v t="$old" -v n="$title" '$2 == t && $3 == n { print $1 }' releases.tsv)
+            [ -n "$id" ] || continue
+            sha=$(gh api "repos/$repo/git/ref/tags/$old" --jq .object.sha)
+            gh api -X POST "repos/$repo/git/refs" -f ref="refs/tags/renumber-$new" -f sha="$sha" > /dev/null 2>&1 || true
+            gh api -X PATCH "repos/$repo/releases/$id" -f tag_name="renumber-$new" > /dev/null
+            gh api -X DELETE "repos/$repo/git/refs/tags/$old" > /dev/null 2>&1 || true
+            echo "Parked $old as renumber-$new"
+          done < renumbers.txt
+          gh api "repos/$repo/releases?per_page=100" --jq '.[] | [.id, .tag_name, .name] | @tsv' > releases.tsv
+          while read -r old new; do
+            [ -n "$old" ] || continue
+            id=$(awk -F'\t' -v t="renumber-$new" '$2 == t { print $1 }' releases.tsv)
+            [ -n "$id" ] || continue
+            sha=$(gh api "repos/$repo/git/ref/tags/renumber-$new" --jq .object.sha)
+            gh api -X POST "repos/$repo/git/refs" -f ref="refs/tags/$new" -f sha="$sha" > /dev/null 2>&1 || true
+            gh api -X PATCH "repos/$repo/releases/$id" -f tag_name="$new" > /dev/null
+            gh api -X DELETE "repos/$repo/git/refs/tags/renumber-$new" > /dev/null 2>&1 || true
+            echo "Moved $old to $new"
+          done < renumbers.txt
       - name: Name APK files after their version
         run: |
-          # Only the file name changes (AgenticOS.apk -> AgenticOS_vX.Y.Z.apk); the file itself stays the same.
+          # Only the file name changes (AgenticOS.apk or an older AgenticOS_vX.Y.Z.apk -> AgenticOS_<tag>.apk);
+          # the file itself stays the same.
           for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
             if ! gh release view "$tag" > /dev/null 2>&1; then continue; fi
             name=$(python3 scripts/release_notes.py --apk-name "$tag")
-            for id in $(gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq '.assets[] | select(.name == "AgenticOS.apk") | .id'); do
+            for id in $(gh api "repos/${{ github.repository }}/releases/tags/$tag" --jq ".assets[] | select((.name | startswith(\"AgenticOS\")) and (.name | endswith(\".apk\")) and .name != \"$name\") | .id"); do
               gh api -X PATCH "repos/${{ github.repository }}/releases/assets/$id" -f name="$name" > /dev/null
               echo "Renamed the APK of $tag to $name"
             done

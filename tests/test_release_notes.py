@@ -58,8 +58,10 @@ def test_published_releases_titles_notes_and_migrations():
 
 
 def test_next_version_follows_semver_and_continues_the_numbering():
-    # "Dodano" means a new feature: MINOR; no git tags yet, so the CHANGELOG headings are the history
-    assert release_notes.next_version(NEW, OLD, []) == "v0.2.0"
+    # PATCH by default, also for "Dodano"; no git tags yet, so the CHANGELOG headings are the history
+    assert release_notes.next_version(NEW, OLD, []) == "v0.1.2"
+    bigger = NEW.replace("Tytuł: New", "Wersja: minor\nTytuł: New")  # a bigger new feature is chosen on purpose
+    assert release_notes.next_version(bigger, OLD, []) == "v0.2.0"
     fixes_only = NEW.replace("- Nowa rzecz.\n", "")
     assert release_notes.next_version(fixes_only, OLD, []) == "v0.1.2"
     assert release_notes.next_version(fixes_only, OLD, ["v0.1.5", "android-9"]) == "v0.1.6"
@@ -113,10 +115,10 @@ def test_apk_asset_is_named_after_the_release_version():
 
 
 def test_test_builds_get_alpha_beta_rc_suffixes_and_the_stable_release_keeps_their_number():
-    beta = NEW.replace("Tytuł: New", "Wersja: beta\nTytuł: New")
+    beta = NEW.replace("Tytuł: New", "Wersja: minor beta\nTytuł: New")
     assert release_notes.next_version(beta, OLD, []) == "v0.2.0-beta.1"
     assert release_notes.next_version(beta, OLD, ["v0.2.0-beta.1"]) == "v0.2.0-beta.2"
-    rc = NEW.replace("Tytuł: New", "Wersja: rc\nTytuł: New")
+    rc = NEW.replace("Tytuł: New", "Wersja: minor rc\nTytuł: New")
     assert release_notes.next_version(rc, OLD, ["v0.2.0-beta.2"]) == "v0.2.0-rc.1"
     fixes_only = NEW.replace("- Nowa rzecz.\n", "")
     assert release_notes.next_version(fixes_only, OLD, ["v0.2.0-rc.1"]) == "v0.2.0"  # not v0.1.2
@@ -129,7 +131,7 @@ def test_a_rebuild_of_the_same_version_gets_build_metadata():
     rebuild = NEW.replace("Tytuł: New", "Wersja: build\nTytuł: New")
     assert release_notes.next_version(rebuild, OLD, []) == "v0.1.1+build.1"
     assert release_notes.next_version(rebuild, OLD, ["v0.1.1+build.1"]) == "v0.1.1+build.2"
-    assert release_notes.next_version(NEW, OLD, ["v0.1.1+build.2"]) == "v0.2.0"  # metadata does not change the number
+    assert release_notes.next_version(NEW, OLD, ["v0.1.1+build.2"]) == "v0.1.2"  # metadata does not change the number
     assert release_notes.apk_name("v0.1.1+build.2") == "AgenticOS_v0.1.1_build.2.apk"
     assert release_notes.parse_version("v0.1.1+build.2") == (0, 1, 1)
 
@@ -160,3 +162,14 @@ def test_install_line_replaces_the_closing_sentence_for_one_release():
     assert release_notes.install("v0.3.0", text).endswith("Nowa wersja instaluje się na poprzedniej.")
     assert "Najpierw odinstaluj" not in release_notes.notes_for_tag(text, "v0.3.1")
 
+
+
+def test_renumbered_releases_are_listed_oldest_first_and_explained_on_the_release_page():
+    text = ("## Następne wydanie\n\n## v0.6.2 – Two\n_01.11.2026 · przenumerowane z v0.8.0_\n\n### Ulepszono\n- Dwa.\n\n"
+            "## v0.6.1 – One\n_01.11.2026 · przenumerowane z v0.7.0_\n\n### Ulepszono\n- Jeden.\n\n"
+            "## v0.6.0 – Base\n_01.11.2026_\n\n### Dodano\n- Baza.\n")
+    assert [(r["was"], r["tag"]) for r in release_notes.releases(text) if r["was"]] == [("v0.8.0", "v0.6.2"), ("v0.7.0", "v0.6.1")]
+    assert release_notes.title_for_tag(text, "v0.6.1") == "One"
+    note = release_notes.release_note(text, "v0.6.1")
+    assert "wcześniej nazywało się **v0.7.0**" in note and release_notes.release_note(text, "v0.6.0") == ""
+    assert not [r for r in release_notes.releases(text) if r["old"]]  # not a pre-SemVer migration
