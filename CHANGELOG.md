@@ -52,6 +52,7 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 ## Następne wydanie
 
 ### Drobne zmiany
+- Skaner bezpieczeństwa CodeQL sprawdza kod serwera, aplikacji webowej, aplikacji na Androida i automatyzacji przy każdej zmianie i co tydzień. Wyniki są w zakładce Security repozytorium.
 - Opisy przenumerowanych wydań (v0.6.1–v0.8.0) mówią osobną linią, że aplikacja może w ustawieniach Androida pokazywać stary numer wersji, np. 0.13.0.
 
 ## v0.8.1 – Messages That Wait for the Network

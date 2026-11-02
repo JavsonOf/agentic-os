@@ -1,0 +1,44 @@
+name: codeql
+
+# Security scanner (GitHub CodeQL): looks for vulnerabilities such as injections, path traversal, XSS
+# or unsafe use of secrets in the Python server, the War Room (JavaScript), the Android app (Java) and
+# these workflows. Findings appear in the repository's Security tab -> Code scanning, and on PRs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1"  # every Monday: new CodeQL rules also catch problems in code that did not change
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write  # upload the results to Code scanning
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript, java-kotlin, actions]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none  # all four are scanned from source, no build needed
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
