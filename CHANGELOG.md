@@ -46,7 +46,22 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Welcoming Empty Screens
+Tytuł: Slash Commands in the Chat
+
+### Dodano
+- Polecenia w czacie: wpisz „/”, a nad polem wiadomości pojawi się lista. Działa dotknięciem albo strzałkami i Enterem.
+  - „/zapamiętaj …” – agent zapamięta to na stałe, bez wysyłania wiadomości.
+  - „/notatka …” – tekst trafia od razu do Wiedzy.
+  - „/codziennie …” – otwiera planowanie, żeby agent robił to sam codziennie.
+  - „/nowa” zaczyna nową rozmowę, a „/historia” otwiera poprzednie.
+  - Polskie znaki są opcjonalne: „/zapamietaj” też działa.
+
+### Ulepszono
+- Niewysłana wiadomość nie znika: gdy wyjdziesz z rozmowy albo z aplikacji, tekst czeka w polu po powrocie, osobno dla każdego agenta.
+- Na komputerze strzałka w górę w pustym polu otwiera edycję Twojej ostatniej wiadomości.
+
+## v0.13.0 – Welcoming Empty Screens
+_02.11.2026_
 
 ### Dodano
 - Nowa rozmowa z agentem wita Cię zamiast pustego ekranu: agent przedstawia się i proponuje 4 gotowe pytania.
