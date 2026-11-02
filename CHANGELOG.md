@@ -8,9 +8,14 @@ mogłyby komuś pomóc w ataku.
 
 - Każde wydanie ma numer w formacie SemVer `vMAJOR.MINOR.PATCH`, teraz `v0.MINOR.PATCH`. Numery idą po kolei,
   bez przeskoków, i nie zależą od numerów budowania ani PR.
-- **MAJOR** (`v0.x.x` → `v1.0.0`): pierwsze stabilne wydanie albo zmiana, która psuje zgodność z poprzednią wersją.
-- **MINOR** (`v0.2.0` → `v0.3.0`): nowe funkcje, ekrany i integracje, czyli punkty w kategorii **Dodano**.
-- **PATCH** (`v0.2.0` → `v0.2.1`): poprawki błędów, ulepszenia, zmiany w automatyzacji i dokumentacji.
+- **PATCH** (`v0.2.0` → `v0.2.1`), domyślnie: poprawki błędów, ulepszenia, wygląd, automatyzacja, dokumentacja
+  i drobne nowości (także punkty w kategorii **Dodano**).
+- **MINOR** (`v0.2.0` → `v0.3.0`), tylko z linią `Wersja: minor`: wyraźnie nowa, większa funkcja, np. nowy ekran,
+  nowa integracja albo nowy sposób pracy z agentami.
+- **MAJOR** (`v0.x.x` → `v1.0.0`), tylko z linią `Wersja: major`: fundamentalna, ogromna zmiana, pierwsze stabilne
+  wydanie albo zmiana, która psuje zgodność z poprzednią wersją.
+- Wydania od v0.7.0 do v0.14.0 dostały 02.11.2026 nowe numery według tej zasady (np. v0.14.0 to teraz v0.8.0).
+  Pod nagłówkiem takiego wydania jest linia „przenumerowane z …”, a strona wydania na GitHubie wyjaśnia zmianę.
 - Tytuł wydania jest po angielsku, bo repozytorium jest publiczne: `vX.Y.Z – Krótki opis najważniejszej zmiany`,
   np. `v0.2.1 – Clear Connection Errors in the Android App`. Bez „Agentic OS” i „Release”. Opisy zmian
   zostają po polsku.
@@ -33,8 +38,8 @@ Opisy są rozszerzone: gdy zmiana obejmuje kilka elementów (agentów, skille, e
 jako podpunkt z wcięciem (`  - …`) i krótkim opisem, co robi. Podpunkty trafiają do opisu wydania.
 
 W linii `Tytuł:` wpisz po angielsku krótki opis najważniejszej zmiany (Title Case, np. „QR Code Pairing”). Numer wersji automat wylicza sam
-(MINOR, gdy jest coś w Dodano, inaczej PATCH). Linię `Wersja: major` albo `Wersja: minor` dopisz tylko wtedy,
-gdy ten automatyczny skok jest za mały. Dla wersji testowej dopisz w tej samej linii `alpha`, `beta` albo `rc`.
+i domyślnie podnosi PATCH. Linię `Wersja: minor` dopisz przy większej nowej funkcji, a `Wersja: major` tylko
+przy fundamentalnej, ogromnej zmianie. Dla wersji testowej dopisz w tej samej linii `alpha`, `beta` albo `rc`.
 Linia `Wersja: alpha`, `Wersja: beta` albo `Wersja: rc` robi z wydania wersję testową następnego numeru
 (`v0.3.0-beta.1`, przy kolejnym scaleniu `v0.3.0-beta.2`), a `Wersja: major rc` daje `v1.0.0-rc.1`. Gdy usuniesz
 tę linię, następne scalenie wyda wersję stabilną z tym samym numerem (`v0.3.0`). Linia `Wersja: build` od razu
@@ -46,7 +51,8 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Slash Commands in the Chat
+## v0.8.0 – Slash Commands in the Chat
+_02.11.2026 · przenumerowane z v0.14.0_
 
 ### Dodano
 - Polecenia w czacie: wpisz „/”, a nad polem wiadomości pojawi się lista. Działa dotknięciem albo strzałkami i Enterem.
@@ -60,8 +66,8 @@ Tytuł: Slash Commands in the Chat
 - Niewysłana wiadomość nie znika: gdy wyjdziesz z rozmowy albo z aplikacji, tekst czeka w polu po powrocie, osobno dla każdego agenta.
 - Na komputerze strzałka w górę w pustym polu otwiera edycję Twojej ostatniej wiadomości.
 
-## v0.13.0 – Welcoming Empty Screens
-_02.11.2026_
+## v0.7.4 – Welcoming Empty Screens
+_02.11.2026 · przenumerowane z v0.13.0_
 
 ### Dodano
 - Nowa rozmowa z agentem wita Cię zamiast pustego ekranu: agent przedstawia się i proponuje 4 gotowe pytania.
@@ -73,8 +79,8 @@ _02.11.2026_
 - Ekran startowy ma delikatną poświatę w kolorze akcentu, a szybkie zadania mają kolorowe ikony.
 - Nagłówki „Na dziś” i „Szybkie zadania” nie są już podkreślone jak linki i wyglądają jak reszta nagłówków w aplikacji.
 
-## v0.12.0 – Smoother Chat and Conversation Search
-_02.11.2026_
+## v0.7.3 – Smoother Chat and Conversation Search
+_02.11.2026 · przenumerowane z v0.12.0_
 
 ### Dodano
 - Wyszukiwanie w historii rozmów: po tytule i po treści wszystkich wiadomości.
@@ -86,8 +92,8 @@ _02.11.2026_
   - Daleko w górze rozmowy przycisk „Na dół” pozwala szybko wrócić do najnowszych wiadomości.
 - Nowa odpowiedź agenta pojawia się płynnie, akapit po akapicie. Przy włączonym w telefonie ograniczeniu animacji pojawia się od razu.
 
-## v0.11.0 – Stop and Regenerate Replies
-_02.11.2026_
+## v0.7.2 – Stop and Regenerate Replies
+_02.11.2026 · przenumerowane z v0.11.0_
 
 ### Dodano
 - Przycisk „Zatrzymaj” w czacie, gdy agent pracuje nad odpowiedzią.
@@ -102,8 +108,8 @@ _02.11.2026_
 ### Drobne zmiany
 - Skill `/scal-i-sprawdz` dla Claude Code w repozytorium (`.claude/skills/`): scala PR, gdy testy są zielone, a potem po kolei sprawdza opisy wydań i nowe wydanie.
 
-## v0.10.0 – Formatted Replies: Lists, Tables and Code
-_01.11.2026_
+## v0.7.1 – Formatted Replies: Lists, Tables and Code
+_01.11.2026 · przenumerowane z v0.10.0_
 
 ### Dodano
 - Odpowiedzi agentów są ładnie sformatowane, zamiast pokazywać surowe znaczki Markdown (#, *, |, ```).
@@ -118,8 +124,8 @@ _01.11.2026_
 - Podglądy odpowiedzi w sekcji „Na dziś” pokazują czysty tekst, bez znaczków formatowania.
 - Powiadomienia (np. „Skopiowano”) przy otwartym oknie pojawiają się u góry ekranu, zamiast zasłaniać listę w oknie.
 
-## v0.9.0 – Conversation History
-_01.11.2026_
+## v0.7.0 – Conversation History
+_01.11.2026 · przenumerowane z v0.9.0_
 
 ### Dodano
 - Historia rozmów w czacie, jak w innych aplikacjach AI: przycisk „Rozmowy” w nagłówku rozmowy.
@@ -131,8 +137,8 @@ _01.11.2026_
 ### Zmieniono
 - „Nowa rozmowa” nie kasuje już poprzedniej rozmowy, tylko odkłada ją do historii.
 
-## v0.8.0 – Reply Actions and One-Tap Follow-Ups
-_01.11.2026_
+## v0.6.2 – Reply Actions and One-Tap Follow-Ups
+_01.11.2026 · przenumerowane z v0.8.0_
 
 ### Dodano
 - Akcje pod każdą odpowiedzią agenta w czacie: odpowiedź nie kończy już rozmowy.
@@ -141,8 +147,8 @@ _01.11.2026_
   - „Rób to codziennie”: jednym dotknięciem pytanie staje się zaplanowanym zadaniem. Formularz otwiera się z nazwą, treścią i agentem już wpisanymi, wystarczy wybrać godzinę i zapisać.
 - Szybkie odpowiedzi pod ostatnią odpowiedzią agenta: „Krócej”, „Więcej szczegółów” i „W punktach” wysyłają gotową prośbę bez pisania.
 
-## v0.7.0 – Connect AI in 60 Seconds
-_01.11.2026_
+## v0.6.1 – Connect AI in 60 Seconds
+_01.11.2026 · przenumerowane z v0.7.0_
 
 ### Dodano
 - „Połącz AI w 60 sekund”: prowadzone podłączenie modelu AI zamiast długiego formularza. Otwiera się z przycisku „Połącz AI” na ekranie startowym i w zakładce Modele.

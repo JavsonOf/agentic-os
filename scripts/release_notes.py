@@ -10,10 +10,11 @@ Releases follow SemVer: tag ``vMAJOR.MINOR.PATCH`` (now ``v0.MINOR.PATCH``) and 
     python scripts/release_notes.py --next-version v0.2.4    version of the next release, e.g. v0.2.5
     python scripts/release_notes.py --next-title v0.2.4      title of the next release
     python scripts/release_notes.py --migrations             "old-tag new-tag" pairs from "dawniej …" lines
+    python scripts/release_notes.py --renumbers              "old-tag new-tag" pairs from "przenumerowane z …" lines
     python scripts/release_notes.py --apk-name v0.2.1        APK asset name, e.g. AgenticOS_v0.2.1.apk
 
 Published releases are sections "## vX.Y.Z – Title" (a line below may say "dawniej android-N"
-for releases published before SemVer). Any other "## ..." heading (normally "Następne wydanie") holds
+for releases published before SemVer, or "przenumerowane z vA.B.C" for a release that got a new number). Any other "## ..." heading (normally "Następne wydanie") holds
 changes that are not released yet, with optional "Tytuł: English title" and "Wersja: major|minor|patch"
 lines ("Wersja: beta", "Wersja: major rc" etc. publish a test build such as v0.3.0-beta.1 instead;
 "Wersja: build" rebuilds the newest version as v0.2.6+build.1). A release section may carry a "> Uwaga: ..." line,
@@ -34,6 +35,7 @@ MINOR = "Drobne zmiany"
 VERSION = r"v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.]+))?(?:\+([0-9A-Za-z.]+))?"
 TAG_HEADING = re.compile(rf"^##\s+({VERSION})(?:\s+[–—-]\s+(.*))?$")
 OLD_TAG = re.compile(r"dawniej\s+(android-\d+)")
+RENUMBERED = re.compile(rf"przenumerowane z\s+({VERSION})")
 TITLE_LINE = re.compile(r"^Tytuł:\s*(.+)$")
 PHASES = ("alpha", "beta", "rc")
 BUMP_LINE = re.compile(r"^Wersja:\s*((?:major|minor|patch)?\s*(?:alpha|beta|rc)?|build)\s*$")
@@ -76,18 +78,21 @@ def parse(text: str) -> list[tuple[str | None, str, str]]:
 
 
 def releases(text: str) -> list[dict[str, str]]:
-    """Published releases in file order: tag, title, the pre-SemVer tag they replace, "> Uwaga:" and "> Instalacja:"."""
+    """Published releases in file order: tag, title, the pre-SemVer tag they replace, the number they had before
+    renumbering ("was"), "> Uwaga:" and "> Instalacja:"."""
     found: list[dict[str, str]] = []
     for line in text.splitlines():
         m = TAG_HEADING.match(line)
         if m:
-            found.append({"tag": m.group(1), "title": (m.group(7) or "").strip(), "old": "", "note": "", "install": ""})
+            found.append({"tag": m.group(1), "title": (m.group(7) or "").strip(), "old": "", "was": "", "note": "", "install": ""})
         elif found and line.startswith("> Uwaga:"):
             found[-1]["note"] = line[len("> Uwaga:"):].strip()
         elif found and line.startswith("> Instalacja:"):
             found[-1]["install"] = line[len("> Instalacja:"):].strip()
         elif found and not found[-1]["old"] and (old := OLD_TAG.search(line)):
             found[-1]["old"] = old.group(1)
+        elif found and not found[-1]["was"] and (was := RENUMBERED.search(line)):
+            found[-1]["was"] = was.group(1)
     return found
 
 
@@ -130,12 +135,25 @@ def old_version_note(text: str, tag: str) -> str:
             f"zbudowania aplikacji od nowa. To ten sam plik co wcześniej, zmieniła się tylko nazwa wydania.")
 
 
+def renumbered_note(text: str, tag: str) -> str:
+    """For releases that got a new number: the APK inside still reports the number it was built with."""
+    was = next((r["was"] for r in releases(text) if r["tag"] == tag), "")
+    if not was:
+        return ""
+    return (f"> **Uwaga:** to wydanie wcześniej nazywało się **{was}**. Numer zmienił się, gdy uporządkowaliśmy "
+            f"numerację: drobne zmiany podnoszą teraz ostatnią cyfrę, a tylko większe nowe funkcje środkową. "
+            f"Aplikacja z tego wydania może pokazywać w ustawieniach Androida dawny numer {was}, bo jest on zapisany "
+            f"w pliku APK podczas budowania. To ten sam plik co wcześniej, zmieniła się tylko nazwa wydania.")
+
+
 def release_note(text: str, tag: str) -> str:
-    """The section's own "> Uwaga:" line, then the pre-SemVer note, as quoted notes for the release page."""
+    """The section's own "> Uwaga:" line, then the pre-SemVer or renumbering note, as quoted notes for the release page."""
     own = next((r["note"] for r in releases(text) if r["tag"] == tag), "")
     notes = [f"> **Uwaga:** {own}"] if own else []
     if old := old_version_note(text, tag):
         notes.append(old)
+    if was := renumbered_note(text, tag):
+        notes.append(was)
     return "\n\n".join(notes)
 
 
@@ -174,7 +192,10 @@ def next_title(text: str, previous_text: str) -> str:
 
 
 def next_version(text: str, previous_text: str, tags: list[str]) -> str:
-    """Bump the newest stable version: "Wersja:" line if new, else MINOR for "Dodano" points, else PATCH.
+    """Bump the newest stable version: by the "Wersja:" line if it is new, else PATCH.
+
+    PATCH covers fixes, improvements and small new things; MINOR (a bigger new feature) and MAJOR (a fundamental
+    change or the first stable version) are chosen on purpose with "Wersja: minor" / "Wersja: major".
 
     "Wersja: alpha|beta|rc" (optionally after the bump, e.g. "Wersja: major rc") makes a test build of the
     next version: v0.3.0-beta.1, then -beta.2, ... Without it, the stable release keeps the tested number.
@@ -192,7 +213,7 @@ def next_version(text: str, previous_text: str, tags: list[str]) -> str:
     phase = next((w for w in words if w in PHASES), "")
     bump = next((w for w in words if w not in PHASES), "")
     if not bump:
-        bump = "minor" if any(c == "Dodano" for c, _ in new_points(text, previous_text)) else "patch"
+        bump = "patch"  # MINOR and MAJOR only on request: a "Wersja: minor" / "Wersja: major" line
     if not stable:
         version = "v0.1.0"
     elif bump == "major":
@@ -231,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--next-version", metavar="PREVIOUS", help="print the version of the next release")
     group.add_argument("--next-title", metavar="PREVIOUS", help="print the title of the next release")
     group.add_argument("--migrations", action="store_true", help="print 'old-tag new-tag' for releases to rename")
+    group.add_argument("--renumbers", action="store_true", help="print 'old-tag new-tag' for renumbered releases, oldest first")
     group.add_argument("--apk-name", metavar="TAG", help="print the APK asset name of a release")
     parser.add_argument("--changelog", default="CHANGELOG.md")
     args = parser.parse_args(argv)
@@ -240,6 +262,9 @@ def main(argv: list[str] | None = None) -> int:
     text = Path(args.changelog).read_text(encoding="utf-8")
     if args.migrations:
         sys.stdout.writelines(f"{r['old']} {r['tag']}\n" for r in releases(text) if r["old"])
+        return 0
+    if args.renumbers:
+        sys.stdout.writelines(f"{r['was']} {r['tag']}\n" for r in reversed(releases(text)) if r["was"])
         return 0
     if args.title:
         sys.stdout.write(title_for_tag(text, args.title) + "\n")
