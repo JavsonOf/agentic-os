@@ -46,7 +46,21 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Slash Commands in the Chat
+Tytuł: Messages That Wait for the Network
+
+### Dodano
+- Wiadomości bez internetu nie przepadają. Gdy napiszesz do agenta bez połączenia, wiadomość czeka w czacie z napisem „Brak połączenia” i wysyła się sama, gdy wróci sieć.
+  - Działa też po zamknięciu i ponownym otwarciu aplikacji.
+  - Kilka czekających wiadomości wysyła się po kolei, a po wysłaniu pojawia się krótki komunikat.
+- Wiesz, kiedy odpowiedź jest gotowa, nawet gdy aplikacja jest w tle.
+  - W tytule karty widać liczbę nowych odpowiedzi, np. „(2) Agentic OS”. Licznik znika po powrocie do aplikacji.
+  - Z włączonymi powiadomieniami telefon pokazuje początek odpowiedzi albo informację, że zadanie się nie udało.
+
+### Ulepszono
+- Ustawienie „Powiadomienia o prośbach” nazywa się teraz „Powiadomienia o prośbach i odpowiedziach”, bo obejmuje też gotowe odpowiedzi.
+
+## v0.14.0 – Slash Commands in the Chat
+_02.11.2026_
 
 ### Dodano
 - Polecenia w czacie: wpisz „/”, a nad polem wiadomości pojawi się lista. Działa dotknięciem albo strzałkami i Enterem.

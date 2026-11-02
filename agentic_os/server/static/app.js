@@ -991,6 +991,7 @@ function followReply(agent, pid, node) {
     .then((done) => {
       followed.delete(pid);
       updateChat(agent, (entries) => { const e = entries.find((x) => x.pid === pid); if (e) e.done = compactProc(done); });
+      if (document.visibilityState === "hidden") replyReady(agent, done);
       if (node.isConnected) {
         const wasNear = nearBottom();
         renderAgentReply(node, done);
@@ -1035,7 +1036,8 @@ function renderChat() {
     if (e.role === "note") { addMsg("note", e.text); continue; }
     const node = addMsg("agent thinking", e.pid ? "Myślę…" : "⚠️ " + (e.error || "Błąd"));
     node.dataset.q = lastQuestion; node.dataset.qat = String(lastAt || "");
-    if (e.done) renderAgentReply(node, e.done);
+    if (e.queued) queuedView(node);
+    else if (e.done) renderAgentReply(node, e.done);
     else if (e.pid) followReply(agent, e.pid, node);
     else node.classList.remove("thinking");
   }
@@ -1074,7 +1076,7 @@ function regenerate(node) {
   const entry = loadChat(agent).find((x) => x.role === "user" && x.at === at);
   if (entry) resendFrom(agent, at, entry.text);
 }
-function replyPending(entries) { return entries.some((e) => e.role === "agent" && e.pid && !e.done); }
+function replyPending(entries) { return entries.some((e) => e.role === "agent" && ((e.pid && !e.done) || e.queued)); }
 function editMessage(at, bubble, button) {
   const agent = currentAgent();
   if (replyPending(loadChat(agent))) { toast("Poczekaj, aż agent skończy odpowiadać."); return; }
@@ -1118,13 +1120,57 @@ async function sendMessage(text) {
   try {
     proc = await api("/chat", { method: "POST", body: { message: text, agent, session: sessionId(agent), async: true } });
   } catch (err) {
-    reply.classList.remove("thinking"); reply.textContent = "⚠️ " + err.message + (err.network ? " – wiadomość nie dotarła, wyślij ją ponownie." : "");
+    if (err.network) { // no connection: the message waits in the outbox and goes out by itself when the network is back
+      updateChat(agent, (list) => list.push({ role: "agent", queued: text, at: Date.now() }));
+      queuedView(reply); outboxAdd(agent); return;
+    }
+    reply.classList.remove("thinking"); reply.textContent = "⚠️ " + err.message;
     updateChat(agent, (list) => list.push({ role: "agent", error: reply.textContent.slice(2), at: Date.now() }));
     return;
   }
   updateChat(agent, (list) => list.push({ role: "agent", pid: proc.pid, at: Date.now() }));
   followReply(agent, proc.pid, reply);
 }
+/* Outbox: messages written without a connection are kept (also across reloads) and sent in order as soon as the
+   phone is online again – no "wiadomość nie dotarła, wyślij ponownie". */
+function queuedView(node) {
+  node.classList.add("thinking", "queued"); node.replaceChildren(el("span", { text: "📶 Brak połączenia – ta wiadomość wyśle się automatycznie, gdy wróci sieć." }));
+}
+const outboxAgents = () => { try { return JSON.parse(store.get("aos_outbox", "[]")) || []; } catch { return []; } };
+function outboxAdd(agent) {
+  const list = outboxAgents(); if (!list.includes(agent)) store.set("aos_outbox", JSON.stringify([...list, agent]));
+  outboxTimer = outboxTimer || setInterval(flushOutbox, 15000);
+}
+let outboxTimer = null; let flushing = false;
+async function flushOutbox() {
+  if (flushing) return;
+  const agents = outboxAgents();
+  if (!agents.length) { clearInterval(outboxTimer); outboxTimer = null; return; }
+  flushing = true; let sent = 0;
+  try {
+    for (const agent of agents) {
+      for (;;) {
+        const q = loadChat(agent).find((e) => e.role === "agent" && e.queued);
+        if (!q) break;
+        let result;
+        try {
+          const proc = await api("/chat", { method: "POST", body: { message: q.queued, agent, session: sessionId(agent), async: true } });
+          result = { role: "agent", pid: proc.pid, at: q.at };
+        } catch (err) {
+          if (err.network) return; // still offline: try again later
+          result = { role: "agent", error: err.message, at: q.at };
+        }
+        updateChat(agent, (list) => { const i = list.findIndex((e) => e.queued && e.at === q.at); if (i >= 0) list[i] = result; });
+        if (result.pid) sent++;
+        if (state.tab === "convo" && currentAgent() === agent) renderChat();
+      }
+      store.set("aos_outbox", JSON.stringify(outboxAgents().filter((a) => a !== agent)));
+    }
+    if (sent) toast(sent === 1 ? "📶 Połączenie wróciło – wiadomość została wysłana" : `📶 Połączenie wróciło – wysłano ${sent} wiadomości`);
+  } finally { flushing = false; }
+}
+window.addEventListener("online", flushOutbox);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") flushOutbox(); });
 /* Slash commands: "/" in the chat box opens a menu of actions you can do without leaving the conversation –
    remember a fact, save a note to Wiedza, make it a daily task, start a new conversation, open the history.
    The menu filters as you type, works with a tap or with the arrows + Enter, and Escape closes it. */
@@ -1320,7 +1366,25 @@ async function decide(id, body) {
 }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pollApprovals(); });
 
-/* "Powiadomienia o prośbach": a system notification when an agent waits for you and the app is in the background. */
+/* An answer that finished while the app was in the background: the tab title counts them ("(2) Agentic OS"), and with
+   notifications on, the phone shows the start of the answer. Opening the app clears the count. */
+let unread = 0;
+const baseTitle = document.title;
+async function replyReady(agent, proc) {
+  unread++; document.title = `(${unread}) ${baseTitle}`;
+  if (!notificationsOn()) return;
+  const ok = proc.status === "completed" || (proc.result && proc.result.output);
+  const title = ok ? `${agent} odpowiedział` : `${agent}: zadanie się nie udało`;
+  const body = ok ? plainText((proc.result && proc.result.output) || "").slice(0, 140) : "Otwórz Agentic OS, żeby zobaczyć szczegóły.";
+  try {
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    if (reg) await reg.showNotification(title, { body, tag: "reply-" + proc.pid, icon: "/icon-192.png" });
+    else new Notification(title, { body, tag: "reply-" + proc.pid });
+  } catch { /* the browser refused: the title count is still there */ }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && unread) { unread = 0; document.title = baseTitle; } });
+
+/* "Powiadomienia o prośbach i odpowiedziach": a system notification when an agent waits for you and the app is in the background. */
 const notificationsOn = () => store.get("aos_notify") === "1" && "Notification" in window && Notification.permission === "granted";
 async function notify(a) {
   if (!notificationsOn()) return;
@@ -2092,6 +2156,7 @@ async function start() {
   try { await Promise.all([refreshAgents(), refreshProviders()]); } catch (err) { toast(err.message, true); }
   showTab(store.get("aos_tab", "chat"));
   pollApprovals();
+  if (outboxAgents().length) { outboxTimer = setInterval(flushOutbox, 15000); flushOutbox(); }
 }
 applyTheme(currentTheme());
 applyAccent(currentAccent());
