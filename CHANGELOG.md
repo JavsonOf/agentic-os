@@ -46,7 +46,20 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Stop and Regenerate Replies
+Tytuł: Smoother Chat and Conversation Search
+
+### Dodano
+- Wyszukiwanie w historii rozmów: po tytule i po treści wszystkich wiadomości.
+  - Gdy pasuje treść, pod tytułem widać fragment wiadomości z szukanym słowem.
+  - Polskie znaki są opcjonalne: „lodz” znajdzie „Łódź”, a „zrob” znajdzie „zrób”.
+
+### Ulepszono
+- Czat nie przewija się już sam na dół, gdy czytasz wcześniejsze wiadomości. Zamiast tego pojawia się przycisk „↓ Nowa odpowiedź” (albo „Agent czeka na Twoją decyzję”), który przenosi na dół jednym dotknięciem.
+  - Daleko w górze rozmowy przycisk „Na dół” pozwala szybko wrócić do najnowszych wiadomości.
+- Nowa odpowiedź agenta pojawia się płynnie, akapit po akapicie. Przy włączonym w telefonie ograniczeniu animacji pojawia się od razu.
+
+## v0.11.0 – Stop and Regenerate Replies
+_02.11.2026_
 
 ### Dodano
 - Przycisk „Zatrzymaj” w czacie, gdy agent pracuje nad odpowiedzią.

@@ -809,14 +809,16 @@ function openConversation(agent, session) {
   store.set("aos_session_" + agent, session);
   closeSheet(); renderChat();
 }
+/* Search that forgives missing Polish letters: "zrob" finds "zrób", "lodz" finds "Łódź". Same length as the input. */
+function fold(text) { return String(text).toLowerCase().replace(/ł/g, "l").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
 function openHistory() {
   const agent = currentAgent();
   const list = loadHistory(agent);
-  const item = (c) => el("div", { class: "hist-item" },
+  const item = (c, snippet) => el("div", { class: "hist-item" },
     el("button", { type: "button", class: "hist-open", onclick: () => openConversation(agent, c.session) },
       el("span", { class: "tile soft" }, icon("chat", 18)),
       el("span", { class: "today-text" }, el("b", { text: c.title }),
-        el("small", { text: `${dayLabel(c.at)} · ${countOf(c.count, "wiadomość", "wiadomości", "wiadomości")}` }))),
+        el("small", { text: snippet || `${dayLabel(c.at)} · ${countOf(c.count, "wiadomość", "wiadomości", "wiadomości")}` }))),
     el("button", { type: "button", class: "reply-act", "aria-label": `Usuń rozmowę: ${c.title}`, title: "Usuń", onclick: () => {
       if (!confirm("Usunąć tę rozmowę z historii?")) return;
       store.del(`aos_chat_${agent}_${c.session}`);
@@ -824,9 +826,30 @@ function openHistory() {
       api("/chat/reset", { method: "POST", body: { agent, session: c.session } }).catch(() => {});
       openHistory();
     } }, "✕"));
+  const listBox = el("div", { class: "hist-list" }, ...list.map((c) => item(c)));
+  // Search titles and every message of the archived conversations (they live in this browser, so it is instant).
+  const texts = new Map(list.map((c) => {
+    let entries = [];
+    try { entries = JSON.parse(store.get(`aos_chat_${agent}_${c.session}`, "[]")) || []; } catch { /* damaged entry */ }
+    return [c.session, entries.map((e) => e.role === "user" ? e.text : plainText((e.done && e.done.result && e.done.result.output) || "")).filter(Boolean)];
+  }));
+  const search = el("input", { type: "search", class: "hist-search", placeholder: "Szukaj w rozmowach…", "aria-label": "Szukaj w rozmowach", oninput: () => {
+    const q = fold(search.value.trim());
+    const hits = list.map((c) => {
+      if (!q) return [c, null];
+      if (fold(c.title).includes(q)) return [c, null];
+      const line = texts.get(c.session).find((t) => fold(t).includes(q));
+      if (!line) return null;
+      const at = fold(line).indexOf(q); const from = Math.max(0, at - 30);
+      return [c, (from ? "…" : "") + line.slice(from, at + q.length + 50).replace(/\s+/g, " ") + "…"];
+    }).filter(Boolean);
+    listBox.replaceChildren(...(hits.length ? hits.map(([c, snip]) => item(c, snip))
+      : [el("p", { class: "muted", text: `Brak rozmów pasujących do „${search.value.trim()}”.` })]));
+  } });
   openSheet(`Rozmowy z ${agent}`,
     el("button", { type: "button", class: "btn primary btn-wide", onclick: () => { closeSheet(); newConversation(); } }, icon("plus", 18), " Nowa rozmowa"),
-    list.length ? el("div", { class: "hist-list" }, ...list.map(item))
+    list.length > 1 ? search : null,
+    list.length ? listBox
       : el("p", { class: "muted", text: "Tu pojawią się Twoje poprzednie rozmowy. „Nowa rozmowa” zachowuje obecną, zamiast ją kasować." }));
 }
 
@@ -842,6 +865,24 @@ function insertBeforeAsks(node) {
   if (firstAsk) chatLog.insertBefore(node, firstAsk); else chatLog.append(node);
   chatLog.scrollTop = chatLog.scrollHeight;
 }
+/* The chat only follows new content while you are at the bottom; reading further up is never interrupted.
+   Otherwise a "↓ Nowa odpowiedź" button appears and takes you down when you want. */
+function nearBottom() { return chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 140; }
+function followNew(wasNear, label = "Nowa odpowiedź") {
+  if (wasNear) { chatLog.scrollTop = chatLog.scrollHeight; return; }
+  const jump = $("#chat-jump"); $("#chat-jump-text").textContent = label;
+  jump.classList.add("new"); jump.classList.remove("hidden");
+}
+const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+chatLog.addEventListener("scroll", () => {
+  const jump = $("#chat-jump");
+  if (nearBottom()) { jump.classList.add("hidden"); jump.classList.remove("new"); }
+  else if (chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight > 600) {
+    if (!jump.classList.contains("new")) $("#chat-jump-text").textContent = "Na dół";
+    jump.classList.remove("hidden");
+  }
+}, { passive: true });
+$("#chat-jump").addEventListener("click", () => chatLog.scrollTo({ top: chatLog.scrollHeight, behavior: reduceMotion() ? "auto" : "smooth" }));
 function toolChipLabel(r) {
   const n = (r.tool_calls || []).length; const s = r.steps || 1;
   return [n ? countOf(n, "narzędzie", "narzędzia", "narzędzi") : null, countOf(s, "krok", "kroki", "kroków")].filter(Boolean).join(" · ");
@@ -872,6 +913,13 @@ function renderAgentReply(node, proc) {
   } }, icon("wrench", 15), toolChipLabel(r), icon("chevDown", 14));
   node.append(el("div", { class: "reply-bar" }, chip, ...replyActions(r.output || "", node.dataset.q || "")), detail);
   if (node === lastAgentNode()) node.append(followUps(node));
+}
+/* A fresh reply slides in block by block (paragraphs, lists, tables), so it reads like it is being written. */
+function revealReply(node) {
+  if (reduceMotion()) return;
+  const blocks = node.querySelectorAll(".md > *, .reply-bar, .reply-follow");
+  blocks.forEach((b, i) => { b.style.setProperty("--i", String(Math.min(i, 14))); b.classList.add("reveal"); });
+  setTimeout(() => blocks.forEach((b) => b.classList.remove("reveal")), 1600);
 }
 /* A reply is not a dead end: copy or share it, turn the question into a daily task, or follow up with one tap. */
 function lastAgentNode() { const all = chatLog.querySelectorAll(".msg.agent"); return all[all.length - 1]; }
@@ -943,7 +991,12 @@ function followReply(agent, pid, node) {
     .then((done) => {
       followed.delete(pid);
       updateChat(agent, (entries) => { const e = entries.find((x) => x.pid === pid); if (e) e.done = compactProc(done); });
-      if (node.isConnected) { renderAgentReply(node, done); chatLog.scrollTop = chatLog.scrollHeight; }
+      if (node.isConnected) {
+        const wasNear = nearBottom();
+        renderAgentReply(node, done);
+        revealReply(node);
+        followNew(wasNear);
+      }
     });
 }
 function chatEmpty() {
@@ -1144,7 +1197,7 @@ function renderApprovals(list, force = false) {
   state.approvalKey = key;
   if (state.tab === "chat") loadToday(); // the "Na dziś" feed shows waiting decisions too
   chatLog.querySelectorAll(".ask-card").forEach((n) => { if (!inline.some((a) => a.id === n.dataset.ask)) n.remove(); });
-  for (const a of inline) if (!chatLog.querySelector(`[data-ask="${a.id}"]`)) { chatLog.append(approvalCard(a, false)); chatLog.scrollTop = chatLog.scrollHeight; }
+  for (const a of inline) if (!chatLog.querySelector(`[data-ask="${a.id}"]`)) { const wasNear = nearBottom(); chatLog.append(approvalCard(a, false)); followNew(wasNear, "Agent czeka na Twoją decyzję"); }
   const box = $("#approvals");
   box.classList.toggle("hidden", !elsewhere.length);
   box.querySelectorAll(".ask-card").forEach((n) => { if (!elsewhere.some((a) => a.id === n.dataset.ask)) n.remove(); });
