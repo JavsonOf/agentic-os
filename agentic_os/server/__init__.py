@@ -37,6 +37,7 @@ POST     /agents/external                  ``{name, protocol, url, api_key?, mod
 DELETE   /agents/{name}                    remove an agent
 POST     /chat                             ``{message, agent?, session?, async?}`` multi-turn chat
 POST     /chat/reset                       ``{agent?, session?}``
+POST     /processes/{pid}/cancel           stop a queued or running process ("Zatrzymaj")
 POST     /chat/rewind                      ``{agent?, session?, turns}`` forget the last exchanges (edit a message)
 POST     /crew                             ``{task, agents, process?}`` run a crew (async)
 GET      /knowledge                        ingested documents
@@ -522,6 +523,8 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 else:
                     raise HTTPError(400, "Send 'approve' (true/false) or 'answer'")
                 return 200, {"ok": True}
+            if m := re.fullmatch(r"/processes/(\w+)/cancel", path):
+                return 200, system.cancel_process(m.group(1)).to_dict()
             if m := re.fullmatch(r"/processes/(\w+)/feedback", path):
                 reward = body.get("reward")
                 if not isinstance(reward, (int, float)) or not -1 <= reward <= 1:

@@ -88,7 +88,7 @@ class Process:
     pid: str
     agent: str
     task: str
-    status: str = "queued"  # queued | running | waiting (for the operator) | completed | failed
+    status: str = "queued"  # queued | running | waiting (for the operator) | completed | failed | cancelled
     result: dict[str, Any] | None = None
     error: str | None = None
     created_at: float = field(default_factory=time.time)
@@ -97,6 +97,7 @@ class Process:
     strategy: str | None = None  # prompt strategy an adaptive agent picked for this run
     step: int = 0  # model turns taken so far (live progress for the War Room)
     max_steps: int = 0
+    cancel_requested: bool = False  # set by cancel_process(); the run stops before its next step
     _future: Future | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
@@ -114,6 +115,10 @@ class Process:
             "step": self.step,
             "max_steps": self.max_steps,
         }
+
+
+class ProcessCancelled(Exception):
+    """Raised inside a run when the operator pressed "Zatrzymaj"; the process ends as ``cancelled``."""
 
 
 @dataclass
@@ -861,7 +866,7 @@ class AgenticOS:
 
     def _prune_processes(self) -> None:
         """Forget the oldest finished processes so a long-running server does not grow without end."""
-        finished = [pid for pid, p in self.processes.items() if p.status in ("completed", "failed")]
+        finished = [pid for pid, p in self.processes.items() if p.status in ("completed", "failed", "cancelled")]
         for pid in finished[: max(0, len(finished) - self.MAX_FINISHED_PROCESSES)]:
             del self.processes[pid]
 
@@ -880,6 +885,9 @@ class AgenticOS:
         return runner
 
     def _execute(self, proc: Process, context: str | None, runner: Any = None) -> Process:
+        if proc.cancel_requested:  # stopped while still queued
+            proc.status, proc.error, proc.finished_at = "cancelled", "Stopped by the user", time.time()
+            return proc
         proc.status, proc.started_at = "running", time.time()
         self._local.pid = proc.pid
         try:
@@ -888,6 +896,8 @@ class AgenticOS:
                 runner = copy.copy(runner)  # report live progress on this run only
 
                 def progress(step: int, limit: int) -> None:
+                    if proc.cancel_requested:  # checked before every model call, so a stop costs no further tokens
+                        raise ProcessCancelled()
                     proc.step, proc.max_steps = step, limit
 
                 runner.on_step = progress
@@ -897,6 +907,9 @@ class AgenticOS:
                 proc.result["strategy"] = proc.strategy
             proc.status = "completed"
             self.metrics.incr("os.processes.completed")
+        except ProcessCancelled:
+            proc.status, proc.error = "cancelled", "Stopped by the user"
+            self.metrics.incr("os.processes.cancelled")
         except Exception as exc:  # noqa: BLE001 - recorded on the process
             proc.status, proc.error = "failed", f"{type(exc).__name__}: {exc}"
             self.metrics.incr("os.processes.failed")
@@ -941,6 +954,21 @@ class AgenticOS:
         proc = self.process(pid)
         if proc._future is not None:
             proc._future.result(timeout=timeout)
+        return proc
+
+    def cancel_process(self, pid: str) -> Process:
+        """Stop a queued or running process. A run stops before its next model call; a pending approval is denied."""
+        proc = self.process(pid)
+        if proc.status in ("completed", "failed", "cancelled"):
+            return proc
+        proc.cancel_requested = True
+        with self._lock:
+            pending = [a for a in self.approvals.values() if a.pid == pid]
+        for item in pending:  # unblock a run that waits for the operator
+            item.decision = False
+            item._event.set()
+        if proc.status == "queued" and proc._future is not None and proc._future.cancel():
+            proc.status, proc.error, proc.finished_at = "cancelled", "Stopped by the user", time.time()
         return proc
 
     def process(self, pid: str) -> Process:

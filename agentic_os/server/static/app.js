@@ -274,7 +274,7 @@ async function waitForProcess(pid, onTick, onOffline) {
     }
     polls++;
     if (onTick) onTick(p);
-    if (p.status === "completed" || p.status === "failed") return p;
+    if (p.status === "completed" || p.status === "failed" || p.status === "cancelled") return p;
     await new Promise((r) => setTimeout(r, polls < 10 ? 700 : 1500));
   }
   throw new Error("Przekroczono czas oczekiwania");
@@ -848,7 +848,10 @@ function toolChipLabel(r) {
 }
 function renderAgentReply(node, proc) {
   node.classList.remove("thinking"); node.replaceChildren();
-  if (proc.status === "failed") { node.append(...errorView(proc.error)); return; }
+  const retry = () => (node === lastAgentNode() && node.dataset.qat ? el("div", { class: "reply-follow" },
+    el("button", { type: "button", class: "follow-chip", onclick: () => regenerate(node) }, icon("repeat", 14), " Spróbuj ponownie")) : null);
+  if (proc.status === "cancelled") { node.append(el("p", { class: "muted stopped", text: "⏹ Zatrzymałeś tę odpowiedź." })); const r = retry(); if (r) node.append(r); return; }
+  if (proc.status === "failed") { node.append(...errorView(proc.error)); const r = retry(); if (r) node.append(r); return; }
   const r = proc.result || {};
   node.append(markdown(r.output || "(brak odpowiedzi)"));
   const detail = el("div", { class: "tool-detail hidden" });
@@ -868,7 +871,7 @@ function renderAgentReply(node, proc) {
     const open = detail.classList.toggle("hidden") === false; chip.setAttribute("aria-expanded", String(open));
   } }, icon("wrench", 15), toolChipLabel(r), icon("chevDown", 14));
   node.append(el("div", { class: "reply-bar" }, chip, ...replyActions(r.output || "", node.dataset.q || "")), detail);
-  if (node === lastAgentNode()) node.append(followUps());
+  if (node === lastAgentNode()) node.append(followUps(node));
 }
 /* A reply is not a dead end: copy or share it, turn the question into a daily task, or follow up with one tap. */
 function lastAgentNode() { const all = chatLog.querySelectorAll(".msg.agent"); return all[all.length - 1]; }
@@ -896,8 +899,10 @@ function repeatDaily(question) {
 const FOLLOW_UPS = [["Krócej", "Napisz to krócej, w 2–3 zdaniach."], ["Więcej szczegółów", "Rozwiń to i dodaj więcej szczegółów."],
   ["W punktach", "Przedstaw to w punktach."]];
 const FOLLOW_PROMPTS = new Set(FOLLOW_UPS.map(([, prompt]) => prompt));
-function followUps() {
+function followUps(node) {
   return el("div", { class: "reply-follow", role: "group", "aria-label": "Szybkie odpowiedzi" },
+    node && node.dataset.qat ? el("button", { type: "button", class: "follow-chip", title: "Inna odpowiedź na to samo pytanie",
+      onclick: () => regenerate(node) }, icon("repeat", 14), " Wygeneruj ponownie") : null,
     ...FOLLOW_UPS.map(([label, prompt]) => el("button", { type: "button", class: "follow-chip", text: label, onclick: () => sendMessage(prompt) })));
 }
 /* The conversation is kept in this browser so a reload, a dropped connection or a closed tab never loses an answer. */
@@ -921,11 +926,17 @@ function compactProc(p) {
 function followReply(agent, pid, node) {
   if (followed.has(pid)) return;
   followed.add(pid);
-  const offline = () => { if (node.isConnected) { node.classList.add("thinking"); node.textContent = "📶 Brak połączenia – agent pracuje dalej, pokażę odpowiedź, gdy wróci sieć…"; } };
+  const label = el("span", { class: "think-label", text: node.textContent || "Myślę…" });
+  const stop = el("button", { type: "button", class: "stop-btn", "aria-label": "Zatrzymaj odpowiedź", onclick: async () => {
+    stop.disabled = true; label.textContent = "Zatrzymuję…";
+    try { await api(`/processes/${pid}/cancel`, { method: "POST", body: {} }); }
+    catch (err) { stop.disabled = false; toast(err.message, true); }
+  } }, el("span", { class: "stop-square", "aria-hidden": "true" }), "Zatrzymaj");
+  if (node.classList.contains("thinking")) node.replaceChildren(label, stop);
+  const offline = () => { if (node.isConnected) { node.classList.add("thinking"); label.textContent = "📶 Brak połączenia – agent pracuje dalej, pokażę odpowiedź, gdy wróci sieć…"; } };
   const tick = (p) => {
-    if (!node.isConnected) return;
-    const label = p.status === "waiting" ? "Czekam na Twoją decyzję…" : p.step > 1 ? `Pracuję… krok ${p.step} z ~${p.max_steps}` : "Myślę…";
-    if (node.classList.contains("thinking")) node.textContent = label;
+    if (!node.isConnected || stop.disabled) return;
+    label.textContent = p.status === "waiting" ? "Czekam na Twoją decyzję…" : p.step > 1 ? `Pracuję… krok ${p.step} z ~${p.max_steps}` : "Myślę…";
   };
   waitForProcess(pid, tick, offline).catch((err) => ({ pid, status: "failed",
     error: err.status === 404 ? "Ta odpowiedź przepadła (serwer został uruchomiony ponownie). Wyślij pytanie jeszcze raz." : err.message }))
@@ -944,13 +955,13 @@ function renderChat() {
   const entries = loadChat(agent);
   chatLog.replaceChildren();
   if (!entries.length) chatEmpty();
-  let lastDay = null; let lastQuestion = "";
+  let lastDay = null; let lastQuestion = ""; let lastAt = 0;
   for (const e of entries) {
     if (e.at && (lastDay === null || dayDiff(e.at) !== lastDay)) { lastDay = dayDiff(e.at); chatLog.append(el("span", { class: "day-sep", text: dayLabel(e.at) })); }
-    if (e.role === "user") { userMsg(e); if (!FOLLOW_PROMPTS.has(e.text)) lastQuestion = e.text; continue; }
+    if (e.role === "user") { userMsg(e); lastAt = e.at; if (!FOLLOW_PROMPTS.has(e.text)) lastQuestion = e.text; continue; }
     if (e.role === "note") { addMsg("note", e.text); continue; }
     const node = addMsg("agent thinking", e.pid ? "Myślę…" : "⚠️ " + (e.error || "Błąd"));
-    node.dataset.q = lastQuestion;
+    node.dataset.q = lastQuestion; node.dataset.qat = String(lastAt || "");
     if (e.done) renderAgentReply(node, e.done);
     else if (e.pid) followReply(agent, e.pid, node);
     else node.classList.remove("thinking");
@@ -968,6 +979,27 @@ function userMsg(entry) {
     onclick: () => editMessage(entry.at, bubble, edit) }, icon("pen", 15));
   bubble.after(edit);
   return bubble;
+}
+/* Replace the conversation from one of your messages on: the server forgets the later exchanges, then `text` is sent.
+   Used by "Edytuj" (new text) and "Wygeneruj ponownie" (same text). */
+async function resendFrom(agent, at, text) {
+  const entries = loadChat(agent);
+  const idx = entries.findIndex((x) => x.role === "user" && x.at === at);
+  if (idx < 0) return false;
+  if (replyPending(entries)) { toast("Poczekaj, aż agent skończy odpowiadać."); return false; }
+  // The server remembers one exchange per finished answer; forget those from this message on.
+  const turns = entries.slice(idx).filter((x) => x.role === "agent" && x.done && x.done.status === "completed").length;
+  try { await api("/chat/rewind", { method: "POST", body: { agent, session: sessionId(agent), turns } }); }
+  catch (err) { toast(err.message, true); return false; }
+  saveChat(agent, entries.slice(0, idx));
+  renderChat();
+  sendMessage(text);
+  return true;
+}
+function regenerate(node) {
+  const agent = currentAgent(); const at = Number(node.dataset.qat);
+  const entry = loadChat(agent).find((x) => x.role === "user" && x.at === at);
+  if (entry) resendFrom(agent, at, entry.text);
 }
 function replyPending(entries) { return entries.some((e) => e.role === "agent" && e.pid && !e.done); }
 function editMessage(at, bubble, button) {
@@ -988,18 +1020,8 @@ function editMessage(at, bubble, button) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = ta.value.trim(); if (!text) { ta.focus(); return; }
-    const entries = loadChat(agent);
-    const idx = entries.findIndex((x) => x.role === "user" && x.at === at);
-    if (idx < 0) { close(); return; }
-    if (replyPending(entries)) { toast("Poczekaj, aż agent skończy odpowiadać."); return; }
-    // The server remembers one exchange per finished answer; forget those from this message on.
-    const turns = entries.slice(idx).filter((x) => x.role === "agent" && x.done && x.done.status === "completed").length;
     send.disabled = true;
-    try { await api("/chat/rewind", { method: "POST", body: { agent, session: sessionId(agent), turns } }); }
-    catch (err) { send.disabled = false; toast(err.message, true); return; }
-    saveChat(agent, entries.slice(0, idx));
-    renderChat();
-    sendMessage(text);
+    if (!(await resendFrom(agent, at, text))) { send.disabled = false; if (!loadChat(agent).some((x) => x.at === at)) close(); }
   });
   bubble.classList.add("hidden"); button.classList.add("hidden");
   button.after(form);
@@ -1018,6 +1040,7 @@ async function sendMessage(text) {
   const reply = addMsg("agent thinking", "Myślę…");
   // "W punktach" only reshapes the previous answer, so "Rób to codziennie" keeps the original question.
   reply.dataset.q = FOLLOW_PROMPTS.has(text) ? (before && before.dataset.q) || "" : text;
+  reply.dataset.qat = String(entry.at);
   let proc;
   try {
     proc = await api("/chat", { method: "POST", body: { message: text, agent, session: sessionId(agent), async: true } });
@@ -1303,7 +1326,7 @@ $("#crew-form").addEventListener("submit", withBusy($("#crew-form"), async (fd) 
 
 /* ------------------------------------------------------------ tasks (C2) */
 const DAYS = { daily: "Codziennie", weekdays: "W dni robocze", weekends: "W weekendy" };
-const STATUS = { running: ["info", "w toku"], queued: ["info", "w kolejce"], waiting: ["warn", "czeka na Ciebie"], completed: ["ok", "gotowe"], failed: ["warn", "błąd"] };
+const STATUS = { running: ["info", "w toku"], queued: ["info", "w kolejce"], waiting: ["warn", "czeka na Ciebie"], completed: ["ok", "gotowe"], failed: ["warn", "błąd"], cancelled: ["", "zatrzymane"] };
 const isActive = (p) => ["running", "queued", "waiting"].includes(p.status);
 const modelError = (msg) => /LLMError|HTTP \d{3}|quota|model|provider|API key|RESOURCE_EXHAUSTED|overloaded|credit|billing/i.test(String(msg || ""));
 async function loadTasks() {

@@ -3,6 +3,7 @@
 import io
 import json
 import threading
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -275,3 +276,50 @@ def test_removing_the_default_provider_falls_back_to_the_settings_model(tmp_path
         assert "default_provider" not in again.prefs
     finally:
         again.shutdown()
+
+
+def test_stop_button_ends_a_run_before_its_next_step():
+    import threading as th
+
+    from agentic_os.llm import LLMResponse, ToolCall
+
+    started, release = th.Event(), th.Event()
+    calls = []
+
+    class SlowLLM:
+        model = "slow"
+
+        def complete(self, messages, **kwargs):
+            calls.append(1)
+            started.set()
+            release.wait(5)
+            return LLMResponse(text="", tool_calls=[ToolCall(f"c{len(calls)}", "calculator", {"expression": "1+1"})],
+                               stop_reason="tool_use")
+
+    system = AgenticOS(Settings(provider="mock"), llm=SlowLLM())
+    try:
+        system.spawn("worker", tools=["calculator"])
+        proc = system.chat("licz bez końca", agent="worker", session="s", wait=False)
+        assert started.wait(5)
+        assert system.cancel_process(proc.pid).cancel_requested
+        release.set()
+        system.wait(proc.pid, timeout=10)
+        assert proc.status == "cancelled" and len(calls) == 1  # no model call after the stop
+        assert system.cancel_process(proc.pid).status == "cancelled"  # stopping twice is harmless
+        assert not system._sessions[("worker", "s")].messages()  # a stopped run is not remembered
+
+        # A run waiting for the operator's approval is unblocked (denied) and stops.
+        system.update_agent("worker", permission="ask")
+        started.clear(); release.set()
+        waiting = system.chat("policz", agent="worker", session="s2", wait=False)
+        for _ in range(100):
+            if system.pending_approvals():
+                break
+            time.sleep(0.05)
+        assert system.pending_approvals()
+        system.cancel_process(waiting.pid)
+        system.wait(waiting.pid, timeout=10)
+        assert waiting.status == "cancelled" and not system.pending_approvals()
+    finally:
+        release.set()
+        system.shutdown()
