@@ -757,7 +757,7 @@ function renderConvoHead() {
 }
 function openConvo() {
   $("#chat-agent").value = currentAgent();
-  renderConvoHead(); renderChat();
+  renderConvoHead(); renderChat(); restoreDraft();
   setTimeout(() => { if (window.innerWidth > 900) $("#chat-text").focus(); }, 50);
 }
 $("#convo-back").addEventListener("click", () => showTab("chat"));
@@ -765,7 +765,7 @@ $("#convo-settings").addEventListener("click", () => {
   const sheet = $("#convo-sheet"); const open = sheet.classList.toggle("hidden") === false;
   $("#convo-settings").setAttribute("aria-expanded", String(open));
 });
-$("#chat-agent").addEventListener("change", (e) => { selectAgent(e.target.value); renderConvoHead(); renderChat(); });
+$("#chat-agent").addEventListener("change", (e) => { saveDraft(); selectAgent(e.target.value); renderConvoHead(); renderChat(); restoreDraft(); });
 $("#chat-permission").addEventListener("change", (e) => changeAgent(currentAgent(), { permission: e.target.value }, e.target));
 $("#chat-mode").addEventListener("change", (e) => changeAgent(currentAgent(), { mode: e.target.value }, e.target));
 $("#chat-reset").addEventListener("click", () => { newConversation(); $("#convo-sheet").classList.add("hidden"); });
@@ -1020,7 +1020,8 @@ function chatEmpty() {
     el("h2", { text: `Cześć, tu ${a.name}` }),
     el("p", { text: about }),
     el("div", { class: "starters" }, ...STARTERS.map(([ic, label, prompt]) =>
-      el("button", { type: "button", class: "starter", onclick: () => sendMessage(prompt) }, icon(ic, 18), el("span", { text: label }))))));
+      el("button", { type: "button", class: "starter", onclick: () => sendMessage(prompt) }, icon(ic, 18), el("span", { text: label })))),
+    el("p", { class: "slash-tip" }, "Wpisz ", el("kbd", { text: "/" }), ", żeby zapamiętać coś, dodać notatkę albo zaplanować zadanie.")));
 }
 function renderChat() {
   const agent = currentAgent();
@@ -1124,14 +1125,99 @@ async function sendMessage(text) {
   updateChat(agent, (list) => list.push({ role: "agent", pid: proc.pid, at: Date.now() }));
   followReply(agent, proc.pid, reply);
 }
-$("#chat-form").addEventListener("submit", (e) => {
+/* Slash commands: "/" in the chat box opens a menu of actions you can do without leaving the conversation –
+   remember a fact, save a note to Wiedza, make it a daily task, start a new conversation, open the history.
+   The menu filters as you type, works with a tap or with the arrows + Enter, and Escape closes it. */
+const SLASH = [
+  { cmd: "zapamietaj", label: "/zapamiętaj", hint: "Agent zapamięta to na stałe", ic: "spark", arg: "np. Wolę krótkie odpowiedzi",
+    run: async (arg) => {
+      const r = await api("/memory/import", { method: "POST", body: { text: arg, distill: false } });
+      if (!(r.facts_added || r.episodes_added)) throw new Error("Nie udało się tego zapamiętać");
+      toast("🧠 Zapamiętane");
+    } },
+  { cmd: "notatka", label: "/notatka", hint: "Dodaj tekst do Wiedzy", ic: "pen", arg: "treść notatki",
+    run: async (arg) => {
+      await api("/knowledge", { method: "POST", body: { text: arg, metadata: { source: "notatka z czatu", type: "txt" } } });
+      toast("📚 Dodano do Wiedzy");
+    } },
+  { cmd: "codziennie", label: "/codziennie", hint: "Agent zrobi to sam codziennie", ic: "repeat", arg: "co ma robić",
+    run: async (arg) => repeatDaily(arg) },
+  { cmd: "nowa", label: "/nowa", hint: "Nowa rozmowa, ta trafi do historii", ic: "plus", run: async () => newConversation() },
+  { cmd: "historia", label: "/historia", hint: "Poprzednie rozmowy", ic: "clock", run: async () => openHistory() },
+];
+const slashMenu = $("#slash-menu");
+let slashPick = 0;
+function slashParse(text) {
+  const m = /^\/(\S*)(?:\s+([\s\S]*))?$/.exec(text);
+  if (!m) return null;
+  const word = fold(m[1]);
+  return { word, arg: (m[2] || "").trim(), exact: SLASH.find((c) => c.cmd === word), hasSpace: /\s/.test(text) };
+}
+function slashMatches(text) {
+  const p = slashParse(text);
+  if (!p || p.hasSpace) return [];
+  return SLASH.filter((c) => c.cmd.startsWith(p.word));
+}
+function renderSlash() {
+  const ta = $("#chat-text");
+  const list = slashMatches(ta.value);
+  slashMenu.classList.toggle("hidden", !list.length);
+  ta.setAttribute("aria-expanded", String(!!list.length));
+  if (!list.length) return;
+  slashPick = Math.min(slashPick, list.length - 1);
+  slashMenu.replaceChildren(...list.map((c, i) => el("button", { type: "button", role: "option", class: "slash-item" + (i === slashPick ? " on" : ""),
+    "aria-selected": String(i === slashPick), onmousedown: (e) => e.preventDefault(), onclick: () => slashChoose(c) },
+  el("span", { class: "tile soft" }, icon(c.ic, 16)), el("span", { class: "slash-text" }, el("b", { text: c.label }), el("small", { text: c.hint })))));
+}
+function slashChoose(c) {
+  const ta = $("#chat-text");
+  if (c.arg) { ta.value = c.label + " "; ta.placeholder = c.arg; slashMenu.classList.add("hidden"); ta.focus(); return; }
+  ta.value = ""; saveDraft(); slashMenu.classList.add("hidden");
+  c.run("").catch((err) => toast(err.message, true));
+}
+async function runSlash(text) {
+  const p = slashParse(text);
+  if (!p || !p.exact) return false;
+  if (p.exact.arg && !p.arg) { toast(`Dopisz po poleceniu: ${p.exact.arg}`); return true; }
+  try { await p.exact.run(p.arg); } catch (err) { toast(err.message, true); }
+  return true;
+}
+/* Unsent text is kept per agent, so leaving the conversation (or the app) does not lose a half-written message. */
+const draftKey = (agent = currentAgent()) => "aos_draft_" + agent;
+function saveDraft() { const t = $("#chat-text").value; if (t.trim()) store.set(draftKey(), t); else store.del(draftKey()); }
+function restoreDraft() {
+  const ta = $("#chat-text"); ta.value = store.get(draftKey(), "") || ""; ta.placeholder = "Napisz do agenta…";
+  ta.style.height = ""; if (ta.value) ta.style.height = Math.min(ta.scrollHeight, 140) + "px";
+  slashMenu.classList.add("hidden");
+}
+$("#chat-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const ta = $("#chat-text"); const text = ta.value.trim(); if (!text) { ta.focus(); return; }
-  ta.value = ""; ta.style.height = "";
+  ta.value = ""; ta.style.height = ""; ta.placeholder = "Napisz do agenta…"; slashMenu.classList.add("hidden");
+  store.del(draftKey());
+  if (text.startsWith("/") && await runSlash(text)) return;
   sendMessage(text);
 });
-$("#chat-text").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.innerWidth > 900) { e.preventDefault(); $("#chat-form").requestSubmit(); } });
-$("#chat-text").addEventListener("input", (e) => { e.target.style.height = ""; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px"; });
+$("#chat-text").addEventListener("keydown", (e) => {
+  const open = !slashMenu.classList.contains("hidden");
+  if (open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    e.preventDefault(); const n = slashMenu.children.length;
+    slashPick = (slashPick + (e.key === "ArrowDown" ? 1 : n - 1)) % n; renderSlash(); return;
+  }
+  if (open && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey && !e.isComposing))) {
+    e.preventDefault(); slashChoose(slashMatches(e.target.value)[slashPick]); return;
+  }
+  if (open && e.key === "Escape") { e.preventDefault(); slashMenu.classList.add("hidden"); return; }
+  // ↑ in an empty box edits your last message, like in most chat apps.
+  if (e.key === "ArrowUp" && !e.target.value) { const edits = chatLog.querySelectorAll(".msg-edit"); if (edits.length) { e.preventDefault(); edits[edits.length - 1].click(); } return; }
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.innerWidth > 900) { e.preventDefault(); $("#chat-form").requestSubmit(); }
+});
+$("#chat-text").addEventListener("input", (e) => {
+  e.target.style.height = ""; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
+  if (!e.target.value) e.target.placeholder = "Napisz do agenta…";
+  slashPick = 0; renderSlash(); saveDraft();
+});
+$("#chat-text").addEventListener("blur", () => setTimeout(() => slashMenu.classList.add("hidden"), 150));
 $("#chat-attach").addEventListener("click", () => $("#chat-file").click());
 $("#chat-file").addEventListener("change", async (e) => {
   const file = e.target.files[0]; e.target.value = "";
