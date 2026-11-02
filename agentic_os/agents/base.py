@@ -107,6 +107,7 @@ class Agent:
         self.strategy = strategy or ZeroShot()
         self.max_steps = max_steps
         self.on_step: Callable[[int, int], None] | None = None  # progress callback: (step, max_steps)
+        self.on_tool: Callable[[str, dict], None] | None = None  # called before each tool call: (name, arguments)
         self.max_tokens = max_tokens
         self.remember_episodes = remember_episodes
         self.approve_tool = approve_tool
@@ -189,6 +190,8 @@ class Agent:
 
                 if response.tool_calls and response.stop_reason != "max_tokens":
                     for call in response.tool_calls:
+                        if self.on_tool is not None:
+                            self.on_tool(call.name, call.arguments)
                         outcome = self._execute(call)
                         result.tool_calls.append(
                             {"tool": call.name, "arguments": call.arguments, "result": outcome.content[:2000], "is_error": outcome.is_error}
