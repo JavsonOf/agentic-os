@@ -46,7 +46,20 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Smoother Chat and Conversation Search
+Tytuł: Welcoming Empty Screens
+
+### Dodano
+- Nowa rozmowa z agentem wita Cię zamiast pustego ekranu: agent przedstawia się i proponuje 4 gotowe pytania.
+  - Jedno dotknięcie wysyła pytanie, np. „Co potrafisz? Pokaż na przykładach” albo „Zaplanuj mi tydzień”.
+  - Agent z krótkim własnym opisem pokazuje go w powitaniu.
+
+### Ulepszono
+- Pusta lista zadań mówi, co się na niej pojawi, i ma przyciski „Napisz do agenta” i „Zaplanuj zadanie”.
+- Ekran startowy ma delikatną poświatę w kolorze akcentu, a szybkie zadania mają kolorowe ikony.
+- Nagłówki „Na dziś” i „Szybkie zadania” nie są już podkreślone jak linki i wyglądają jak reszta nagłówków w aplikacji.
+
+## v0.12.0 – Smoother Chat and Conversation Search
+_02.11.2026_
 
 ### Dodano
 - Wyszukiwanie w historii rozmów: po tytule i po treści wszystkich wiadomości.

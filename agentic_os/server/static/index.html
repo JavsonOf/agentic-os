@@ -74,17 +74,17 @@
           <button id="offline-fix" class="btn small primary" type="button">Połącz AI</button>
         </div>
         <section id="today" class="today hidden" aria-labelledby="today-title">
-          <h2 id="today-title" class="section-label underline">Na dziś</h2>
+          <h2 id="today-title" class="section-label caps">Na dziś</h2>
           <div id="today-list" class="today-list"></div>
         </section>
         <div id="agent-cards" class="agent-cards" role="list" aria-label="Agenci"></div>
         <section class="quick">
-          <h2 class="section-label underline">Szybkie zadania</h2>
+          <h2 class="section-label caps">Szybkie zadania</h2>
           <div class="quick-grid">
-            <button type="button" class="quick-btn" data-quick="notes">Streść moje notatki</button>
-            <button type="button" class="quick-btn" data-quick="week">Zaplanuj tydzień</button>
-            <button type="button" class="quick-btn" data-quick="crew">Zbierz zespół agentów</button>
-            <button type="button" class="quick-btn" data-quick="import">Importuj pamięć z ChatGPT</button>
+            <button type="button" class="quick-btn" data-quick="notes"><span class="tile soft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h4"/></svg></span><span>Streść moje notatki</span></button>
+            <button type="button" class="quick-btn" data-quick="week"><span class="tile amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span><span>Zaplanuj tydzień</span></button>
+            <button type="button" class="quick-btn" data-quick="crew"><span class="tile info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3 19c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5M15 15c2.6-.4 4.6.8 5.5 3.5"/></svg></span><span>Zbierz zespół agentów</span></button>
+            <button type="button" class="quick-btn" data-quick="import"><span class="tile pink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></span><span>Importuj pamięć z ChatGPT</span></button>
           </div>
         </section>
         <form id="start-form" class="composer">

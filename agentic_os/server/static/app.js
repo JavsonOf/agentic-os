@@ -999,9 +999,28 @@ function followReply(agent, pid, node) {
       }
     });
 }
+/* Ready questions for an empty conversation: one tap sends them, so a new user sees the agent work without
+   having to think of a first question. */
+const STARTERS = [
+  ["spark", "Co potrafisz? Pokaż na przykładach", "Co potrafisz? Pokaż mi 3 konkretne przykłady, w czym możesz mi dziś pomóc."],
+  ["pen", "Streść moje notatki", "Streść moje notatki z bazy wiedzy w kilku punktach."],
+  ["clock", "Zaplanuj mi tydzień", "Zaplanuj mi tydzień na podstawie moich zadań i notatek."],
+  ["question", "Co o mnie pamiętasz?", "Co o mnie pamiętasz? Wypisz najważniejsze rzeczy w punktach."],
+];
 function chatEmpty() {
-  chatLog.replaceChildren(el("div", { class: "empty empty-note", style: "margin:auto;text-align:center" }, el("div", { text: "👋 Napisz, co mam zrobić." }),
-    el("div", { class: "small", text: "Agent użyje narzędzi, pamięci i Twojej bazy wiedzy." })));
+  const a = agentInfo();
+  const idx = state.agents.findIndex((x) => x.name === a.name);
+  const amber = idx % 2 === 1;
+  // A short description says who the agent is; a long one is usually the whole system prompt, so it is not shown here.
+  const own = a.name === "assistant" ? "" : String(a.description || "").trim();
+  const about = a.kind === "external" ? "Agent zewnętrzny. Twoje wiadomości trafiają prosto do niego."
+    : own && own.length <= 140 ? own : "Korzystam z narzędzi, pamięci i Twojej bazy wiedzy. Napisz, co mam zrobić, albo zacznij od jednego z pytań.";
+  chatLog.replaceChildren(el("div", { class: "empty chat-hello" },
+    el("span", { class: "tile hello-avatar " + (amber ? "amber" : "soft"), "aria-hidden": "true" }, icon(amber ? "pen" : "robot", 34)),
+    el("h2", { text: `Cześć, tu ${a.name}` }),
+    el("p", { text: about }),
+    el("div", { class: "starters" }, ...STARTERS.map(([ic, label, prompt]) =>
+      el("button", { type: "button", class: "starter", onclick: () => sendMessage(prompt) }, icon(ic, 18), el("span", { text: label }))))));
 }
 function renderChat() {
   const agent = currentAgent();
@@ -1426,6 +1445,15 @@ function scheduleCard(s) {
       catch (err) { e.target.checked = !e.target.checked; toast(err.message, true); }
     } }));
 }
+function tasksEmpty() {
+  return el("div", { class: "empty-state" },
+    el("span", { class: "tile soft", "aria-hidden": "true" }, icon("clock", 26)),
+    el("b", { text: "Tu zobaczysz pracę agentów" }),
+    el("p", { text: "Każde pytanie z czatu i każde zaplanowane zadanie pojawi się tutaj, razem z wynikiem i kosztem." }),
+    el("div", { class: "empty-actions" },
+      el("button", { type: "button", class: "btn small primary", text: "Napisz do agenta", onclick: () => showTab("convo") }),
+      el("button", { type: "button", class: "btn small", text: "Zaplanuj zadanie", onclick: () => $("#schedule-new").click() })));
+}
 function renderTasks() {
   const f = state.taskFilter;
   const running = state.processes.filter(isActive);
@@ -1434,7 +1462,7 @@ function renderTasks() {
   const list = (f === "running" ? running : state.processes).slice().reverse().slice(0, 50);
   $("#task-list").classList.toggle("hidden", f === "scheduled");
   $("#task-list").replaceChildren(...(list.length ? list.map(taskCard)
-    : [el("p", { class: "empty-note", text: f === "running" ? "Nic teraz nie pracuje." : "Brak zadań. Napisz coś w czacie albo zaplanuj zadanie." })]));
+    : [f === "running" ? el("p", { class: "empty-note", text: "Nic teraz nie pracuje." }) : tasksEmpty()]));
   const showSched = f !== "running";
   $("#schedule-title").classList.toggle("hidden", !showSched);
   $("#schedule-list").classList.toggle("hidden", !showSched);
