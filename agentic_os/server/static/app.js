@@ -1019,7 +1019,7 @@ function followReply(agent, pid, node) {
 const LIVE_TOOLS = [
   [/search|knowledge|rag|retriev|szukaj|find|query/, "🔎", "Szukam w wiedzy"], [/calc/, "🧮", "Liczę"],
   [/http|fetch|web|url|browse|download/, "🌐", "Sprawdzam w internecie"], [/remember|memory|recall|pamie/, "🧠", "Sięgam do pamięci"],
-  [/^ask_|delegate|agent/, "🤝", "Proszę o pomoc innego agenta"], [/time|date|clock/, "🕒", "Sprawdzam datę i godzinę"],
+  [/\bask_|delegate|agent/, "🤝", "Proszę o pomoc innego agenta"], [/time|date|clock/, "🕒", "Sprawdzam datę i godzinę"],
   [/write|save|zapis|file|note/, "📝", "Zapisuję"], [/question|ask_user/, "💬", "Pytam Cię o coś"],
 ];
 function liveStep(a, now) {
@@ -1312,7 +1312,7 @@ function toolAction(name) {
   const n = String(name || "").toLowerCase();
   const rules = [[/write|save|zapis|create_file|append|file/, "zapisać plik"], [/delete|remove|usun|drop/, "coś usunąć"],
     [/mail|send|wysl|message|post|notify/, "wysłać wiadomość"], [/http|fetch|request|web|url|browse|download/, "połączyć się z internetem"],
-    [/^ask_|delegate|agent/, "zlecić zadanie innemu agentowi"], [/calc/, "coś policzyć"], [/search|szukaj|find|query/, "coś wyszukać"],
+    [/\bask_|delegate|agent/, "zlecić zadanie innemu agentowi"], [/calc/, "coś policzyć"], [/search|szukaj|find|query/, "coś wyszukać"],
     [/read|get|list|load/, "odczytać dane"]];
   const hit = rules.find(([re]) => re.test(n));
   return hit ? hit[1] : "użyć narzędzia";
