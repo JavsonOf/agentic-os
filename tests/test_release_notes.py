@@ -172,4 +172,5 @@ def test_renumbered_releases_are_listed_oldest_first_and_explained_on_the_releas
     assert release_notes.title_for_tag(text, "v0.6.1") == "One"
     note = release_notes.release_note(text, "v0.6.1")
     assert "wcześniej nazywało się **v0.7.0**" in note and release_notes.release_note(text, "v0.6.0") == ""
+    assert "ustawieniach Androida pokazywać stary numer (np. **0.7.0**), bo jest on zapisany w pliku APK." in note
     assert not [r for r in release_notes.releases(text) if r["old"]]  # not a pre-SemVer migration

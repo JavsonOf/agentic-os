@@ -140,10 +140,12 @@ def renumbered_note(text: str, tag: str) -> str:
     was = next((r["was"] for r in releases(text) if r["tag"] == tag), "")
     if not was:
         return ""
+    shown = was.lstrip("v")  # Android shows versionName without the "v" (APP_VERSION in android.yml)
     return (f"> **Uwaga:** to wydanie wcześniej nazywało się **{was}**. Numer zmienił się, gdy uporządkowaliśmy "
             f"numerację: drobne zmiany podnoszą teraz ostatnią cyfrę, a tylko większe nowe funkcje środkową. "
-            f"Aplikacja z tego wydania może pokazywać w ustawieniach Androida dawny numer {was}, bo jest on zapisany "
-            f"w pliku APK podczas budowania. To ten sam plik co wcześniej, zmieniła się tylko nazwa wydania.")
+            f"To ten sam plik co wcześniej, zmieniła się tylko nazwa wydania.\n\n"
+            f"> 📱 **Na telefonie** aplikacja może w ustawieniach Androida pokazywać stary numer (np. **{shown}**), "
+            f"bo jest on zapisany w pliku APK.")
 
 
 def release_note(text: str, tag: str) -> str:
