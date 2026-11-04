@@ -980,15 +980,30 @@ function followReply(agent, pid, node) {
     try { await api(`/processes/${pid}/cancel`, { method: "POST", body: {} }); }
     catch (err) { stop.disabled = false; toast(err.message, true); }
   } }, el("span", { class: "stop-square", "aria-hidden": "true" }), "Zatrzymaj");
-  if (node.classList.contains("thinking")) node.replaceChildren(label, stop);
+  // Live view: what the agent is doing right now (tools it used, newest last) and how long it has been working.
+  const clock = el("span", { class: "think-clock", "aria-hidden": "true" });
+  const steps = el("ol", { class: "live-steps", "aria-label": "Co robi agent" });
+  if (node.classList.contains("thinking")) node.replaceChildren(el("div", { class: "think-row" }, label, clock, stop), steps);
+  const since = Number(node.dataset.qat) || Date.now();
+  const tickClock = () => { const s = Math.max(0, Math.round((Date.now() - since) / 1000)); clock.textContent = s >= 3 ? `${s} s` : ""; };
+  tickClock();
+  const timer = setInterval(() => { if (!node.isConnected) clearInterval(timer); else tickClock(); }, 1000);
+  let shown = 0;
   const offline = () => { if (node.isConnected) { node.classList.add("thinking"); label.textContent = "📶 Brak połączenia – agent pracuje dalej, pokażę odpowiedź, gdy wróci sieć…"; } };
   const tick = (p) => {
     if (!node.isConnected || stop.disabled) return;
-    label.textContent = p.status === "waiting" ? "Czekam na Twoją decyzję…" : p.step > 1 ? `Pracuję… krok ${p.step} z ~${p.max_steps}` : "Myślę…";
+    const acts = p.activity || [];
+    label.textContent = p.status === "waiting" ? "Czekam na Twoją decyzję…"
+      : acts.length ? "Pracuję…" : p.step > 1 ? `Pracuję… krok ${p.step} z ~${p.max_steps}` : "Myślę…";
+    if (acts.length !== shown) {
+      shown = acts.length;
+      steps.replaceChildren(...acts.map((a, i) => liveStep(a, i === acts.length - 1 && p.status !== "waiting")));
+    }
   };
   waitForProcess(pid, tick, offline).catch((err) => ({ pid, status: "failed",
     error: err.status === 404 ? "Ta odpowiedź przepadła (serwer został uruchomiony ponownie). Wyślij pytanie jeszcze raz." : err.message }))
     .then((done) => {
+      clearInterval(timer);
       followed.delete(pid);
       updateChat(agent, (entries) => { const e = entries.find((x) => x.pid === pid); if (e) e.done = compactProc(done); });
       if (document.visibilityState === "hidden") replyReady(agent, done);
@@ -999,6 +1014,20 @@ function followReply(agent, pid, node) {
         followNew(wasNear);
       }
     });
+}
+/* One line of the live view: a tool call in plain Polish, with a hint of what it is about. */
+const LIVE_TOOLS = [
+  [/search|knowledge|rag|retriev|szukaj|find|query/, "🔎", "Szukam w wiedzy"], [/calc/, "🧮", "Liczę"],
+  [/http|fetch|web|url|browse|download/, "🌐", "Sprawdzam w internecie"], [/remember|memory|recall|pamie/, "🧠", "Sięgam do pamięci"],
+  [/\bask_|delegate|agent/, "🤝", "Proszę o pomoc innego agenta"], [/time|date|clock/, "🕒", "Sprawdzam datę i godzinę"],
+  [/write|save|zapis|file|note/, "📝", "Zapisuję"], [/question|ask_user/, "💬", "Pytam Cię o coś"],
+];
+function liveStep(a, now) {
+  const n = String(a.tool || "").toLowerCase();
+  const hit = LIVE_TOOLS.find(([re]) => re.test(n));
+  const [emoji, text] = hit ? [hit[1], hit[2]] : ["🔧", `Używam narzędzia „${a.tool}”`];
+  return el("li", { class: now ? "now" : "done" }, el("span", { class: "live-ico", "aria-hidden": "true", text: emoji }),
+    el("span", { text }), a.hint ? el("span", { class: "live-hint", text: `„${a.hint}”` }) : null);
 }
 /* Ready questions for an empty conversation: one tap sends them, so a new user sees the agent work without
    having to think of a first question. */
@@ -1283,7 +1312,7 @@ function toolAction(name) {
   const n = String(name || "").toLowerCase();
   const rules = [[/write|save|zapis|create_file|append|file/, "zapisać plik"], [/delete|remove|usun|drop/, "coś usunąć"],
     [/mail|send|wysl|message|post|notify/, "wysłać wiadomość"], [/http|fetch|request|web|url|browse|download/, "połączyć się z internetem"],
-    [/^ask_|delegate|agent/, "zlecić zadanie innemu agentowi"], [/calc/, "coś policzyć"], [/search|szukaj|find|query/, "coś wyszukać"],
+    [/\bask_|delegate|agent/, "zlecić zadanie innemu agentowi"], [/calc/, "coś policzyć"], [/search|szukaj|find|query/, "coś wyszukać"],
     [/read|get|list|load/, "odczytać dane"]];
   const hit = rules.find(([re]) => re.test(n));
   return hit ? hit[1] : "użyć narzędzia";

@@ -98,6 +98,7 @@ class Process:
     step: int = 0  # model turns taken so far (live progress for the War Room)
     max_steps: int = 0
     cancel_requested: bool = False  # set by cancel_process(); the run stops before its next step
+    activity: list[dict[str, Any]] = field(default_factory=list)  # tools used so far, newest last (live view)
     _future: Future | None = field(default=None, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
@@ -114,7 +115,21 @@ class Process:
             "strategy": self.strategy,
             "step": self.step,
             "max_steps": self.max_steps,
+            "activity": list(self.activity),
         }
+
+
+MAX_ACTIVITY = 12  # newest tool calls kept per process for the live view
+
+
+def _activity_hint(arguments: Any) -> str:
+    """A short, human-readable hint of what a tool call is about: its first non-empty text argument."""
+    if isinstance(arguments, dict):
+        for value in arguments.values():
+            if isinstance(value, str) and value.strip():
+                text = " ".join(value.split())
+                return text if len(text) <= 80 else text[:79] + "…"
+    return ""
 
 
 class ProcessCancelled(Exception):
@@ -900,7 +915,14 @@ class AgenticOS:
                         raise ProcessCancelled()
                     proc.step, proc.max_steps = step, limit
 
+                def tool_used(name: str, arguments: dict) -> None:
+                    if proc.cancel_requested:  # a stop also prevents the next tool call
+                        raise ProcessCancelled()
+                    proc.activity.append({"tool": name, "hint": _activity_hint(arguments), "at": time.time()})
+                    del proc.activity[:-MAX_ACTIVITY]
+
                 runner.on_step = progress
+                runner.on_tool = tool_used
             result = self._with_mode(proc, runner).run(proc.task, context=context)
             proc.result = result.to_dict()
             if proc.strategy:

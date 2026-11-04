@@ -618,7 +618,7 @@ input.need { border-color: var(--warn-pill); }
 /* Notices stay readable above an open sheet instead of covering its list. */
 .sheet-overlay:not(.hidden) ~ .toast, .sheet-overlay:not(.hidden) ~ .snackbar { bottom: auto; top: calc(env(safe-area-inset-top) + 14px); }
 /* "Zatrzymaj" while the agent works */
-.msg.agent.thinking { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.msg.agent.thinking { flex-direction: column; align-items: stretch; gap: 0; }
 .stop-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .stop-btn:hover, .stop-btn:focus-visible { border-color: var(--accent); }
 .stop-btn:disabled { opacity: .6; cursor: default; }
@@ -674,3 +674,20 @@ input.need { border-color: var(--warn-pill); }
 .slash-text small { font-size: 12.5px; color: var(--muted); }
 .slash-tip { margin: 10px 0 0 !important; font-size: 12.5px !important; }
 .slash-tip kbd { display: inline-block; min-width: 18px; padding: 1px 6px; border: 1px solid var(--border-2); border-radius: 6px; background: var(--surface); color: var(--text); font: 700 12px/1.4 ui-monospace, monospace; }
+
+/* Live view of a working agent: what it does right now and for how long. */
+.think-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.think-clock { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.think-row .stop-btn { margin-left: auto; }
+.live-steps { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--text-2); }
+.live-steps:empty { display: none; }
+.live-steps li { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.live-steps li.done { color: var(--muted); }
+.live-steps li.done .live-ico { filter: grayscale(.6); opacity: .75; }
+.live-steps li.now { font-weight: 600; }
+.live-steps li.now .live-ico { animation: live-pulse 1.2s ease-in-out infinite; }
+.live-hint { color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+@keyframes live-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .live-steps li.now .live-ico { animation: none; } }
+.live-steps li > span:nth-child(2) { flex: none; white-space: nowrap; }
+.msg.agent.thinking:has(.live-steps li) { min-width: min(100%, 330px); }

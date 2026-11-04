@@ -51,6 +51,15 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
+Tytuł: Live View of What the Agent Is Doing
+
+### Ulepszono
+- Gdy agent pracuje, zamiast samego „Myślę…” widać na żywo, co właśnie robi.
+  - Każdy krok to jedna linia po polsku, np. „🔎 Szukam w wiedzy „plan na tydzień””, „🧮 Liczę „8*5””, „🌐 Sprawdzam w internecie”.
+  - Bieżący krok jest wyróżniony, a skończone są przygaszone.
+  - Obok widać, od ilu sekund agent pracuje.
+- „Zatrzymaj” zatrzymuje agenta także tuż przed użyciem narzędzia, nie tylko przed kolejnym krokiem modelu.
+
 ### Drobne zmiany
 - Skaner bezpieczeństwa CodeQL sprawdza kod serwera, aplikacji webowej, aplikacji na Androida i automatyzacji przy każdej zmianie i co tydzień. Wyniki są w zakładce Security repozytorium.
 - Opisy przenumerowanych wydań (v0.6.1–v0.8.0) mówią osobną linią, że aplikacja może w ustawieniach Androida pokazywać stary numer wersji, np. 0.13.0.

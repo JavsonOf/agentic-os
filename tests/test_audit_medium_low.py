@@ -323,3 +323,66 @@ def test_stop_button_ends_a_run_before_its_next_step():
     finally:
         release.set()
         system.shutdown()
+
+
+def test_a_running_process_shows_which_tools_it_used():
+    from agentic_os.llm import LLMResponse, ToolCall
+
+    class TwoToolsLLM:
+        model = "tools"
+
+        def __init__(self):
+            self.turn = 0
+
+        def complete(self, messages, **kwargs):
+            self.turn += 1
+            if self.turn == 1:
+                return LLMResponse(text="", stop_reason="tool_use", tool_calls=[
+                    ToolCall("a", "calculator", {"expression": "  2 +   2  "}),
+                    ToolCall("b", "calculator", {"expression": "x" * 200})])
+            return LLMResponse(text="Gotowe: 4", stop_reason="end_turn")
+
+    system = AgenticOS(Settings(provider="mock"), llm=TwoToolsLLM())
+    try:
+        system.spawn("worker", tools=["calculator"])
+        proc = system.chat("policz", agent="worker", session="s", wait=False)
+        system.wait(proc.pid, timeout=10)
+        activity = proc.to_dict()["activity"]
+        assert [a["tool"] for a in activity] == ["calculator", "calculator"]
+        assert activity[0]["hint"] == "2 + 2"  # first text argument, whitespace collapsed
+        assert len(activity[1]["hint"]) == 80 and activity[1]["hint"].endswith("…")
+        assert proc.status == "completed"
+    finally:
+        system.shutdown()
+
+
+def test_stop_also_prevents_the_next_tool_call():
+    import threading as th
+
+    from agentic_os.llm import LLMResponse, ToolCall
+
+    answered, pid_ready = th.Event(), th.Event()
+    proc_box = {}
+
+    class StopMidTurnLLM:
+        model = "stop"
+
+        def complete(self, messages, **kwargs):
+            # the operator presses "Zatrzymaj" while the model's answer (a tool call) is on its way
+            pid_ready.wait(5)
+            system.cancel_process(proc_box["pid"])
+            answered.set()
+            return LLMResponse(text="", stop_reason="tool_use", tool_calls=[ToolCall("a", "calculator", {"expression": "1+1"})])
+
+    system = AgenticOS(Settings(provider="mock"), llm=StopMidTurnLLM())
+    try:
+        system.spawn("worker", tools=["calculator"])
+        system.update_agent("worker", permission="auto")
+        proc = system.chat("policz", agent="worker", session="s", wait=False)
+        proc_box["pid"] = proc.pid
+        pid_ready.set()
+        system.wait(proc.pid, timeout=10)
+        assert answered.is_set() and proc.status == "cancelled"
+        assert proc.to_dict()["activity"] == []  # the tool never ran
+    finally:
+        system.shutdown()
