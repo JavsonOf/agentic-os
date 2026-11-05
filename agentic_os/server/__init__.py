@@ -139,15 +139,27 @@ def _existing_limit(system: AgenticOS, provider_id: str) -> int:
 
 LOGIN_WINDOW = 300  # seconds
 LOGIN_MAX_FAILURES = 20  # wrong passwords per address in that window before it has to wait
+LOGIN_MAX_TRACKED = 10_000  # addresses remembered at once, so many sources cannot grow the table without end
+IDLE_TIMEOUT = 30  # seconds a connection may sit without sending its request before it is closed
+MAX_CONNECTIONS = 64  # connections served at once; more are closed straight away instead of piling up threads
+# Every response forbids being shown inside another site's frame (clickjacking of approvals and permissions).
+FRAME_HEADERS = (("X-Frame-Options", "DENY"), ("Content-Security-Policy", "frame-ancestors 'none'"))
+
+
+def _trusted_proxies() -> set[str]:
+    """Addresses of reverse proxies (e.g. Caddy) whose X-Forwarded-For names the real client."""
+    return {p.strip() for p in os.environ.get("AGENTIC_OS_TRUSTED_PROXIES", "").split(",") if p.strip()}
 
 
 def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
     api_key = system.settings.api_key
     failures: dict[str, list[float]] = {}  # client address -> times of recent wrong passwords
     failures_lock = threading.Lock()
+    trusted_proxies = _trusted_proxies()
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "AgenticOS/0.1"
+        timeout = IDLE_TIMEOUT  # a silent connection is closed instead of holding a thread forever
 
         def log_message(self, fmt: str, *args: Any) -> None:  # quieter default logging
             system.metrics.incr("http.requests")
@@ -158,6 +170,8 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
+            for name, value in FRAME_HEADERS:
+                self.send_header(name, value)
             self.end_headers()
             self.wfile.write(data)
 
@@ -202,13 +216,30 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 if (origin and origin_host.lower() not in LOCAL_HOSTS) or self.headers.get("Sec-Fetch-Site") == "cross-site":
                     raise HTTPError(403, "Cross-site request refused")
 
+        def _client_ip(self) -> str:
+            """The address wrong passwords are counted against.
+
+            Behind a reverse proxy every visitor arrives from the proxy's address, so one stranger's guesses
+            would lock out the owner too. For a configured proxy, the right-most X-Forwarded-For entry (the
+            address the proxy itself saw) is used; entries further left are written by the client.
+            """
+            peer = self.client_address[0]
+            if peer in trusted_proxies:
+                forwarded = (self.headers.get("X-Forwarded-For") or "").split(",")[-1].strip()
+                if forwarded:
+                    return forwarded
+            return peer
+
         def _authorize(self) -> None:
             path = self.path.split("?", 1)[0]
             if not api_key or path == "/health" or path in STATIC_FILES:
                 return
-            client = self.client_address[0]
+            client = self._client_ip()
             now = time.time()
             with failures_lock:
+                if len(failures) > LOGIN_MAX_TRACKED:  # forget addresses with no recent wrong password
+                    for key in [k for k, v in failures.items() if not v or now - v[-1] >= LOGIN_WINDOW]:
+                        del failures[key]
                 recent = [t for t in failures.get(client, []) if now - t < LOGIN_WINDOW]
                 failures[client] = recent
                 if len(recent) >= LOGIN_MAX_FAILURES:  # slows password guessing to a crawl
@@ -233,6 +264,8 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-cache")
             self.send_header("X-Content-Type-Options", "nosniff")
+            for name, value in FRAME_HEADERS:
+                self.send_header(name, value)
             self.end_headers()
             self.wfile.write(data)
             return True
@@ -563,8 +596,34 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
+class _BoundedServer(ThreadingHTTPServer):
+    """A threaded server that serves at most MAX_CONNECTIONS connections at once."""
+
+    daemon_threads = True
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._slots = threading.BoundedSemaphore(MAX_CONNECTIONS)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        if not self._slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._slots.release()
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._slots.release()
+
+
 def make_server(system: AgenticOS, host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer((host, port), make_handler(system))
+    return _BoundedServer((host, port), make_handler(system))
 
 
 def serve(system: AgenticOS, host: str = "127.0.0.1", port: int = 8000) -> None:  # pragma: no cover - blocking

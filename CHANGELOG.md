@@ -51,7 +51,20 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Live View of What the Agent Is Doing
+Tytuł: Safer War Room and Agent Approvals
+
+### Naprawiono
+- War Room jest bezpieczniejszy po audycie bezpieczeństwa.
+  - Obcy, którzy zgadują hasło, nie blokują już dostępu właścicielowi, gdy serwer stoi za Caddy.
+  - Serwer zamyka połączenia, przez które nic nie przychodzi, i nie da się go nimi zapchać.
+  - Inna strona nie może pokazać War Room w ramce i podstępem wywołać kliknięć.
+  - Kod QR do połączenia telefonu przyjmuje tylko zwykłe adresy stron.
+- Agent w trybie „smart” pyta o zgodę, zanim przekaże zadanie agentowi zewnętrznemu.
+- Serwer MCP nie może przejąć narzędzia innego serwera o podobnej nazwie. Taki serwer dostaje komunikat, żeby zmienić nazwę.
+- Import pamięci z pliku ZIP pomija archiwa ukryte w środku archiwum, więc limit rozmiaru dotyczy całego importu.
+
+## v0.8.2 – Live View of What the Agent Is Doing
+_04.11.2026_
 
 ### Ulepszono
 - Gdy agent pracuje, zamiast samego „Myślę…” widać na żywo, co właśnie robi.

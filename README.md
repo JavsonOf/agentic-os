@@ -180,6 +180,11 @@ docker run -p 8000:8000 -e ANTHROPIC_API_KEY -e AGENTIC_OS_API_KEY=change-me \
   -v agentic-data:/home/agent/data agentic-os   # the volume keeps agents, keys and memory across restarts
 ```
 
+Behind a reverse proxy (Caddy, nginx) set `AGENTIC_OS_TRUSTED_PROXIES` to the proxy's address as the server
+sees it (for Caddy in front of Docker, usually `172.17.0.1`). Wrong passwords are then counted per visitor from
+the proxy's `X-Forwarded-For`, so one stranger's guesses cannot lock out the owner. Without it, every visitor
+shares the proxy's address. `X-Forwarded-For` is ignored from any other address.
+
 ## Development
 
 ```bash

@@ -351,10 +351,11 @@ async function useConnectLink(text) {
   let url;
   try { url = new URL(String(text).trim()); } catch { throw new Error("Ten kod QR nie pochodzi z Agentic OS."); }
   const m = /^#connect=(.*)$/.exec(url.hash);
-  if (!m) throw new Error("Ten kod QR nie pochodzi z Agentic OS.");
+  // Only web addresses: a "javascript:" code would otherwise run its own script on this page.
+  if (!m || !/^https?:$/.test(url.protocol)) throw new Error("Ten kod QR nie pochodzi z Agentic OS.");
   if (url.origin !== location.origin) {
     if (isApp()) { $("#login-server").value = url.origin; throw new Error(`Kod jest dla serwera ${url.host}. Ustaw ten adres w aplikacji (Adres serwera).`); }
-    location.href = url.href; return;
+    location.href = `${url.origin}/#connect=${m[1]}`; return;
   }
   await tryToken(decodeURIComponent(m[1]));
 }

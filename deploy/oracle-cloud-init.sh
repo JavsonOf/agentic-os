@@ -47,6 +47,8 @@ umask 077
 cat > "$APP_DIR/.env" <<EOF
 AGENTIC_OS_API_KEY=$WAR_ROOM_PASSWORD
 AGENTIC_OS_DATA_DIR=/home/agent/data
+# Caddy reaches the container through the Docker bridge: count wrong passwords per real visitor, not per proxy.
+AGENTIC_OS_TRUSTED_PROXIES=172.17.0.1
 EOF
 cat > "$APP_DIR/repo.conf" <<EOF
 GITHUB_REPO=$GITHUB_REPO
