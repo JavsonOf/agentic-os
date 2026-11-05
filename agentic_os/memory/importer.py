@@ -211,7 +211,12 @@ def _parse_zip(data: bytes) -> ParsedExport:
     for info in candidates:
         if re.search(r"(^|/)(user|users|account|shared_conversations|message_feedback)\.json$", info.filename, re.IGNORECASE):
             continue
-        part = parse_export(zf.read(info), info.filename)
+        raw = zf.read(info)
+        if raw[:4] == b"PK\x03\x04":
+            # An archive inside the archive would get its own fresh size limit (a nested zip bomb). Real
+            # exports never nest them, so the entry is skipped and the limit above covers the whole import.
+            continue
+        part = parse_export(raw, info.filename)
         merged.conversations += part.conversations
         merged.facts += part.facts
         if part.source and part.source not in merged.source.split(", "):

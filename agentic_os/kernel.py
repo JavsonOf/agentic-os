@@ -375,10 +375,9 @@ class AgenticOS:
             self.mcp[cfg.name] = client
             try:
                 client.connect()
-                for t in client.as_tools():
-                    self.tools.register(t)
-            except MCPError:
-                pass  # status shows the error; the user can retry from the UI
+                self._register_mcp_tools(client)
+            except MCPError as exc:
+                client.error = client.error or str(exc)  # status shows it; the user can retry from the UI
 
     def remove_provider(self, provider_id: str) -> bool:
         """Delete a provider; agents that used it switch to the default model instead of disappearing."""
@@ -581,6 +580,14 @@ class AgenticOS:
             return True  # an unknown tool fails on its own without side effects
         return "readonly" in tool.tags or ("agent" in tool.tags and "external" not in tool.tags)
 
+    def _delegates_outside(self, tool: Tool | None) -> bool:
+        """True for ask_<target> when the target is an external agent (it has no approval gate of ours).
+
+        The target is resolved by name when the tool runs, so this is checked at call time, not when built.
+        """
+        target = getattr(getattr(tool, "func", None), "delegate_target", None)
+        return target is not None and isinstance(self.agents.get(target), ExternalAgent)
+
     def _approval_hook(self, agent_name: str) -> Callable[[ToolCall], bool]:
         def hook(call: ToolCall) -> bool:
             agent = self.agents.get(agent_name)
@@ -592,7 +599,7 @@ class AgenticOS:
                 return True
             if permission == "smart" and agent is not None:
                 tool = agent.tools._tools.get(call.name)
-                if self.is_read_only(tool):
+                if self.is_read_only(tool) and not self._delegates_outside(tool):
                     return True
             item = self._wait_for_operator(agent_name, call.name, dict(call.arguments or {}), "tool")
             return bool(item.decision)
@@ -710,6 +717,7 @@ class AgenticOS:
             finally:
                 self._local.depth = depth
 
+        delegate.delegate_target = target  # type: ignore[attr-defined]  # read by the approval hook
         return Tool(
             name=f"ask_{target}",
             description=f"Delegate a self-contained sub-task to the '{target}' agent and get its answer back.",
@@ -748,11 +756,32 @@ class AgenticOS:
         if config.name in self.mcp:
             self.remove_mcp(config.name)
         client = MCPClient(config).connect()
+        try:
+            self._register_mcp_tools(client)
+        except MCPError:
+            client.close()
+            raise
         self.mcp[config.name] = client
-        for t in client.as_tools():
-            self.tools.register(t)
         self._save_mcp()
         return client
+
+    def _register_mcp_tools(self, client: MCPClient) -> None:
+        """Register a server's tools, refusing names that another server or tool already owns.
+
+        Local names are mcp_<server>_<tool>, so servers "files" and "files_admin" could both produce
+        mcp_files_admin_delete; the later one would silently take over the tool and its "always allow".
+        """
+        tools = client.as_tools()
+        owner = f"mcp:{client.config.name}"
+        seen: set[str] = set()
+        for t in tools:
+            existing = self.tools._tools.get(t.name)
+            if t.name in seen or (existing is not None and owner not in existing.tags):
+                raise MCPError(f"Narzędzie {t.name} z serwera MCP {client.config.name} ma taką samą nazwę jak inne "
+                               "narzędzie. Zmień nazwę serwera.")
+            seen.add(t.name)
+        for t in tools:
+            self.tools.register(t)
 
     def remove_mcp(self, name: str) -> bool:
         client = self.mcp.pop(name, None)
