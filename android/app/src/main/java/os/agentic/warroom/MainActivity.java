@@ -87,8 +87,7 @@ public class MainActivity extends Activity {
                     askForServer(false);
                     return true;
                 }
-                Uri server = Uri.parse(serverUrl());
-                if (url.getHost() != null && url.getHost().equals(server.getHost())) {
+                if (isServer(url)) {
                     return false; // stay inside the app for the War Room itself
                 }
                 openExternally(url); // links to other sites open in the browser
@@ -160,10 +159,12 @@ public class MainActivity extends Activity {
         });
     }
 
-    /** True for pages of the user's own server (the only pages the app keeps inside the WebView). */
+    /**
+     * True for pages of the user's own server (the only pages the app keeps inside the WebView): same scheme,
+     * host and port, so another service on the same machine or an http:// copy is not trusted.
+     */
     private boolean isServer(Uri url) {
-        String host = Uri.parse(serverUrl()).getHost();
-        return url != null && host != null && host.equals(url.getHost());
+        return url != null && Friendly.sameOrigin(serverUrl(), url.toString());
     }
 
     /**

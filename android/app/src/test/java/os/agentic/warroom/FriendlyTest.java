@@ -43,4 +43,19 @@ public class FriendlyTest {
         assertNotNull(Friendly.httpError(502));
         assertNotNull(Friendly.httpError(404));
     }
+
+    @Test
+    public void trustsOnlyTheServersOwnOrigin() {
+        String server = "https://example.com/";
+        assertTrue(Friendly.sameOrigin(server, "https://example.com/chat?x=1"));
+        assertTrue(Friendly.sameOrigin(server, "https://EXAMPLE.com:443/"));
+        assertTrue(Friendly.sameOrigin("http://localhost:8000/", "http://localhost:8000/api"));
+        assertFalse(Friendly.sameOrigin(server, "http://example.com/"));
+        assertFalse(Friendly.sameOrigin(server, "https://example.com:8443/"));
+        assertFalse(Friendly.sameOrigin(server, "https://evil.example.com/"));
+        assertFalse(Friendly.sameOrigin("http://localhost:8000/", "http://localhost:9000/"));
+        assertFalse(Friendly.sameOrigin(server, null));
+        assertFalse(Friendly.sameOrigin(server, "javascript:alert(1)"));
+        assertFalse(Friendly.sameOrigin(null, null));
+    }
 }

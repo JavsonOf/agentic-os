@@ -63,6 +63,37 @@ final class Friendly {
         return new Address(url.endsWith("/") ? url : url + "/", null);
     }
 
+    /**
+     * True when both addresses have the same scheme, host and port (the web "origin"). Comparing only the host
+     * would also trust another service on the same machine (another port) or a plain-http copy of the page.
+     */
+    static boolean sameOrigin(String a, String b) {
+        String first = origin(a);
+        return first != null && first.equals(origin(b));
+    }
+
+    private static String origin(String url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            URI uri = new URI(url.trim());
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (scheme == null || host == null || host.isEmpty()) {
+                return null;
+            }
+            scheme = scheme.toLowerCase(Locale.ROOT);
+            int port = uri.getPort();
+            if (port == -1) {
+                port = scheme.equals("https") ? 443 : scheme.equals("http") ? 80 : -1;
+            }
+            return scheme + "://" + host.toLowerCase(Locale.ROOT) + ":" + port;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     /** Title and explanation for a WebView error, never the raw "net::ERR_…" code. */
     static String[] networkError(int code, String description, boolean online) {
         String d = description == null ? "" : description.toUpperCase(Locale.ROOT);
