@@ -51,7 +51,13 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Safer Android App and Release Builds
+Tytuł: Gemini Works Again After Google Library Update
+
+### Naprawiono
+- Gemini znowu odpowiada po aktualizacji biblioteki Google do wersji 3.0. Nowa wersja łączyła się z inną wersją API, w której nie ma domyślnego modelu, więc każde zapytanie kończyło się błędem, że model nie istnieje.
+
+## v0.8.4 – Safer Android App and Release Builds
+_07.11.2026_
 
 ### Naprawiono
 - Aplikacja na Androida jest bezpieczniejsza.

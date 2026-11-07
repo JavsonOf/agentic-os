@@ -19,6 +19,9 @@ if TYPE_CHECKING:  # pragma: no cover
 
 DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
 GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+# google-genai 3.0 switched its default to the stable "v1" API, which lacks the "-latest" aliases
+# (such as the default model) and newer features. Pin the API version the provider is built for.
+GEMINI_API_VERSION = "v1beta"
 SDK_MISSING = "The 'google-genai' package is required: pip install -e \".[gemini]\" in the agentic-os folder"
 _GENERATED_PREFIX = "gemcall_"
 _ids = itertools.count(1)
@@ -51,7 +54,10 @@ class GeminiProvider(LLMProvider):
                 from google import genai
             except ImportError as exc:  # pragma: no cover - depends on env
                 raise LLMError(SDK_MISSING) from exc
-            client = genai.Client(api_key=api_key) if api_key else genai.Client()
+            http_options = _types().HttpOptions(api_version=GEMINI_API_VERSION)
+            client = genai.Client(api_key=api_key, http_options=http_options) if api_key else genai.Client(
+                http_options=http_options
+            )
         self.client = client
         self.model = model
 
