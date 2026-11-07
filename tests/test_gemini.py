@@ -90,3 +90,22 @@ def test_settings_select_gemini(monkeypatch):
     llm = create_llm(Settings(provider="gemini"))
     assert isinstance(llm, GeminiProvider) and llm.model == "gemini-flash-latest"
     assert create_llm(Settings(provider="gemini", model="gemma-4-31b-it")).model == "gemma-4-31b-it"
+
+
+def test_client_uses_v1beta_api(monkeypatch):
+    # google-genai 3.0 defaults to the "v1" API, where "gemini-flash-latest" does not exist.
+    from google import genai
+
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            seen.update(kwargs)
+
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    GeminiProvider(api_key="test-key")
+    assert seen["api_key"] == "test-key"
+    assert seen["http_options"].api_version == "v1beta"
+    seen.clear()
+    GeminiProvider()
+    assert seen["http_options"].api_version == "v1beta"
