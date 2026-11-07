@@ -61,6 +61,8 @@ jobs:
           echo "Previous: ${previous:-none} (stable: ${stable:-none}) · next: $version – $title · publish: $worth"
           cat release-notes.md
       - name: Signing key
+        # Pull requests never get the release key: their code is not reviewed yet, so they build with the debug key.
+        if: github.event_name != 'pull_request'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           PUBLISH: ${{ steps.notes.outputs.publish }}
@@ -78,7 +80,7 @@ jobs:
           fi
       - name: Build APK
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
         run: gradle -p android --no-daemon assembleRelease testReleaseUnitTest
       - name: Rename APK
         run: |

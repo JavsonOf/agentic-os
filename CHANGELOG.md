@@ -51,7 +51,20 @@ np. gdy zmienił się klucz podpisu i starą aplikację trzeba najpierw odinstal
 
 ## Następne wydanie
 
-Tytuł: Safer War Room and Agent Approvals
+Tytuł: Safer Android App and Release Builds
+
+### Naprawiono
+- Aplikacja na Androida jest bezpieczniejsza.
+  - Traktuje jako War Room tylko strony z dokładnie tego samego adresu serwera (ten sam protokół, host i port). Inna usługa na tym samym komputerze albo wersja bez https nie dostaje kamery ani mikrofonu.
+  - Linki do takich stron otwierają się w przeglądarce, a nie w aplikacji.
+
+### Drobne zmiany
+- Bezpieczniejsze automatyczne buildy.
+  - Testowe buildy aplikacji z pull requestów nie dostają klucza podpisu wydań.
+  - Testy na prawdziwych modelach korzystają z kluczy API tylko na gałęzi main.
+
+## v0.8.3 – Safer War Room and Agent Approvals
+_05.11.2026_
 
 ### Naprawiono
 - War Room jest bezpieczniejszy po audycie bezpieczeństwa.

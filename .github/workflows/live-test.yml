@@ -1,7 +1,7 @@
 name: Live model test
 
 # Calls real model APIs (costs tokens or free-tier quota), so it only runs on
-# demand or when the live smoke test itself changes. Each provider job needs its
+# demand or when the live smoke test itself changes, and only on main. Each provider job needs its
 # repository secret: GEMINI_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY.
 on:
   workflow_dispatch:
@@ -16,6 +16,7 @@ on:
         description: Effort level (Claude only)
         default: low
   push:
+    branches: [main]  # model keys are only used on reviewed code, never on other branches
     paths:
       - scripts/live_smoke.py
       - agentic_os/llm/**
@@ -27,6 +28,7 @@ permissions:
 jobs:
   live:
     name: live (${{ matrix.provider }})
+    if: github.ref == 'refs/heads/main'  # also for manual runs: secrets only on main
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
