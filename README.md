@@ -184,6 +184,10 @@ Behind a reverse proxy (Caddy, nginx) set `AGENTIC_OS_TRUSTED_PROXIES` to the pr
 sees it (for Caddy in front of Docker, usually `172.17.0.1`). Wrong passwords are then counted per visitor from
 the proxy's `X-Forwarded-For`, so one stranger's guesses cannot lock out the owner. Without it, every visitor
 shares the proxy's address. `X-Forwarded-For` is ignored from any other address.
+A browser `Origin` is accepted only for this server's own address (scheme, host and port;
+behind a proxy the scheme is `X-Forwarded-Proto`). `AGENTIC_OS_ALLOWED_ORIGINS` is an optional
+comma-separated list of extra origins, for example `https://app.example`. Programs that send
+no `Origin` (curl, the Android app) are unchanged.
 
 ## Development
 

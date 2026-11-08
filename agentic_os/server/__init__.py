@@ -55,7 +55,11 @@ POST     /agents/{name}/settings           ``{permission?, mode?, skills?}`` cha
 =======  ================================  =========================================
 
 Set ``AGENTIC_OS_API_KEY`` to require ``Authorization: Bearer <key>``. The
-server refuses to listen on a public interface without it.
+server refuses to listen on a public interface without it. A JSON body must
+use ``Content-Type: application/json``. A browser ``Origin`` must be this
+server (scheme, host and port; the scheme is ``X-Forwarded-Proto`` behind a
+proxy) or listed in ``AGENTIC_OS_ALLOWED_ORIGINS``. Requests with no
+``Origin`` are accepted.
 """
 
 from __future__ import annotations
@@ -151,11 +155,69 @@ def _trusted_proxies() -> set[str]:
     return {p.strip() for p in os.environ.get("AGENTIC_OS_TRUSTED_PROXIES", "").split(",") if p.strip()}
 
 
+def _origin_key(value: str) -> tuple[str, str, int] | None:
+    """``(scheme, host, port)`` for an absolute http(s) origin, with the default port filled in."""
+    try:
+        parts = urllib.parse.urlsplit(value.strip())
+        port = parts.port
+    except ValueError:
+        return None
+    host = (parts.hostname or "").lower()
+    if parts.scheme not in ("http", "https") or not host or parts.username is not None:
+        return None
+    return parts.scheme, host, port if port is not None else (443 if parts.scheme == "https" else 80)
+
+
+def _host_key(host_header: str, scheme: str) -> tuple[str, str, int] | None:
+    """The origin a request was sent to, from its ``Host`` header and a scheme."""
+    value = host_header.strip()
+    if not value or scheme not in ("http", "https"):
+        return None
+    port_text = ""
+    if value.startswith("["):
+        end = value.find("]")
+        if end < 0:
+            return None
+        name, rest = value[1:end], value[end + 1:]
+        if rest.startswith(":"):
+            port_text = rest[1:]
+        elif rest:
+            return None
+    elif value.count(":") == 1:
+        name, port_text = value.split(":", 1)
+    else:
+        name = value
+    if not name:
+        return None
+    if not port_text:
+        port = 443 if scheme == "https" else 80
+    elif port_text.isdigit() and int(port_text) <= 65535:
+        port = int(port_text)
+    else:
+        return None
+    return scheme, name.lower(), port
+
+
+def _configured_origins() -> set[tuple[str, str, int]]:
+    """Extra browser origins from ``AGENTIC_OS_ALLOWED_ORIGINS`` (comma-separated)."""
+    found: set[tuple[str, str, int]] = set()
+    for raw in os.environ.get("AGENTIC_OS_ALLOWED_ORIGINS", "").split(","):
+        if key := _origin_key(raw):
+            found.add(key)
+    return found
+
+
+def _json_content_type(header: str | None) -> bool:
+    """True for ``application/json``, including parameters such as ``charset``."""
+    return (header or "").split(";", 1)[0].strip().lower() == "application/json"
+
+
 def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
     api_key = system.settings.api_key
     failures: dict[str, list[float]] = {}  # client address -> times of recent wrong passwords
     failures_lock = threading.Lock()
     trusted_proxies = _trusted_proxies()
+    allowed_origins = _configured_origins()
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "AgenticOS/0.1"
@@ -190,6 +252,10 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 raise HTTPError(413, "Request body too large")
             if not length:
                 return {}
+            # application/json is not a browser "simple request", so another site cannot POST it here
+            # without a preflight this server never answers. text/plain is, and would be parsed as JSON.
+            if not _json_content_type(self.headers.get("Content-Type")):
+                raise HTTPError(415, "Content-Type must be application/json")
             try:
                 body = json.loads(self.rfile.read(length))
             except json.JSONDecodeError as exc:
@@ -198,23 +264,38 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 raise HTTPError(400, "JSON body must be an object")
             return body
 
+        def _check_origin(self) -> None:
+            """Refuse a browser Origin that is not this server (or an allowed extra origin).
+
+            No Origin (curl, the Android app) stays allowed. The scheme is http on a direct
+            connection and ``X-Forwarded-Proto`` when a reverse proxy terminates TLS, so the
+            War Room served over https still matches the ``Host`` header.
+            """
+            origin = self.headers.get("Origin")
+            if not origin:
+                return
+            key = _origin_key(origin)
+            scheme = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+            expected = _host_key(self.headers.get("Host") or "", scheme if scheme in ("http", "https") else "http")
+            if key is not None and (key in allowed_origins or key == expected):
+                return
+            raise HTTPError(403, "Cross-site request refused")
+
         def _guard_local(self, method: str) -> None:
             """Without a password the server only trusts its own machine.
 
             A web page can still reach 127.0.0.1 from the owner's browser: directly (CSRF, e.g. a form that
             adds an MCP server which runs a program) or through a domain that resolves to 127.0.0.1 (DNS
-            rebinding). Requests must name a local host, and browser writes must come from a local page.
+            rebinding). Requests must name a local host, and a browser that marks the write cross-site
+            is refused. The Origin itself is checked for every request in ``_check_origin``.
             """
             if api_key:
                 return  # every request needs the bearer token, which another site cannot read or send
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
             if host and host not in LOCAL_HOSTS:
                 raise HTTPError(403, "Forbidden host: without AGENTIC_OS_API_KEY only localhost is accepted")
-            if method != "GET":
-                origin = self.headers.get("Origin")
-                origin_host = (urllib.parse.urlsplit(origin).hostname or "") if origin and origin != "null" else ""
-                if (origin and origin_host.lower() not in LOCAL_HOSTS) or self.headers.get("Sec-Fetch-Site") == "cross-site":
-                    raise HTTPError(403, "Cross-site request refused")
+            if method != "GET" and self.headers.get("Sec-Fetch-Site") == "cross-site":
+                raise HTTPError(403, "Cross-site request refused")
 
         def _client_ip(self) -> str:
             """The address wrong passwords are counted against.
@@ -275,6 +356,7 @@ def make_handler(system: AgenticOS) -> type[BaseHTTPRequestHandler]:
                 path = self.path.split("?", 1)[0]
                 if method == "GET" and self._static(path):
                     return
+                self._check_origin()
                 self._guard_local(method)
                 self._authorize()
                 status, payload = self._route(method, path.rstrip("/") or "/")

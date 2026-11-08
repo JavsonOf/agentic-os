@@ -91,6 +91,7 @@ CASES = [
     ('Cross-site request refused', 'innej strony'),
     ('Too many wrong passwords, try again in a few minutes', 'odczekaj'),
     ('Invalid Content-Length', 'niepoprawne dane'),
+    ('Content-Type must be application/json', 'złym formacie'),
     ('Re-enter the API key when changing the provider address', 'klucz API jeszcze raz'),
     ("Re-enter the mod's headers when changing its address", 'nagłówki'),
     ('HTTP Error 302: Refused a redirect to another host (evil.example) so the API key is not sent there', 'evil.example'),
