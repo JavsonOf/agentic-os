@@ -20,6 +20,7 @@ const ERROR_RULES = [
   [/(?:^|: )Stopped by the user$/, "⏹ Zatrzymałeś to zadanie przyciskiem „Zatrzymaj”. Możesz wysłać je jeszcze raz."],
   [/Too many wrong passwords/, "🔒 Za dużo prób z błędnym hasłem. Ze względów bezpieczeństwa odczekaj kilka minut i spróbuj ponownie."],
   [/(?:^|: )Invalid Content-Length/, "🧩 Aplikacja wysłała niepoprawne dane. Odśwież stronę i spróbuj ponownie."],
+  [/Content-Type must be application\/json/, "🧩 Aplikacja wysłała dane w złym formacie. Odśwież stronę i spróbuj ponownie."],
   [/Missing or invalid API key|Wymagane logowanie/, "🔒 Nieprawidłowe hasło do War Room albo sesja wygasła. Zaloguj się ponownie."],
   [/Przekroczono czas oczekiwania/, "⏱️ Agent pracuje dłużej niż zwykle. Wynik pojawi się w zakładce Zadania, gdy będzie gotowy."],
   [/(?:^|: )No route (?:or item )?for /, "🧩 Ta funkcja nie istnieje na serwerze. Serwer ma starszą wersję niż aplikacja – zrób na serwerze git pull i uruchom go ponownie."],

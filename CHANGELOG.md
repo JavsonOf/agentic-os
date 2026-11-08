@@ -56,17 +56,27 @@ instalacji („Nowa wersja instaluje się nad poprzednią.”), np. gdy starą a
 
 ## Następne wydanie
 
+Tytuł: Stricter Local Request Checks
+
+### Naprawiono
+- Poprawiono bezpieczeństwo serwera: prośby, które coś zmieniają, są przyjmowane z War Room albo z programów takich jak curl i aplikacja na telefonie. Prośba z innej strony jest odrzucana.
+  - Dodatkową zaufaną stronę można dopisać w zmiennej środowiskowej, żeby własny interfejs nadal działał.
+
 ### Drobne zmiany
 - Opisy wydań na GitHubie są po angielsku i po polsku, w stałych sekcjach: najważniejsze, nowości, ulepszenia, poprawki oraz dokumentacja i CI.
 
 #### PL Tytuł
-Dwujęzyczne opisy wydań
+Bezpieczniejsze prośby do serwera
 
 #### PL Najważniejsze
-Opisy wydań na GitHubie są po angielsku i po polsku, w tych samych sekcjach.
+Serwer przyjmuje zmiany z War Room albo z programów na tym komputerze. Prośba z innej strony jest odrzucana.
 
 #### EN Highlights
-GitHub release pages are in English and then in Polish, with the same sections every time.
+The server accepts changes from the War Room or from programs on the same machine. A request from another website is refused.
+
+#### EN Bug Fixes
+- The server accepts changes from the War Room or from programs such as curl and the phone app. A request from another website is refused.
+  - An extra trusted website can be listed in an environment variable so a custom interface keeps working.
 
 #### EN Docs & CI
 - GitHub releases are written in English and in Polish, with fixed sections: highlights, new features, improvements, bug fixes, and docs and CI.

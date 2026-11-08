@@ -54,9 +54,14 @@ def test_passwordless_server_refuses_other_sites_and_rebound_hosts(open_server):
     with pytest.raises(urllib.error.HTTPError) as err:
         urllib.request.urlopen(req, timeout=10)
     assert err.value.code == 403
-    # The War Room on localhost and local tools without an Origin keep working.
+    # The War Room opened on this exact origin, and local tools that send no Origin, keep working.
     port = base.rsplit(":", 1)[1]
-    assert _post(base, "/memory", {"Origin": f"http://localhost:{port}"}) != 403
+    same = urllib.request.Request(
+        base + "/chat/reset", data=b"{}", method="POST",
+        headers={"Content-Type": "application/json", "Origin": f"http://127.0.0.1:{port}"},
+    )
+    with urllib.request.urlopen(same, timeout=10) as resp:
+        assert resp.status == 200
     with urllib.request.urlopen(base + "/providers", timeout=10) as resp:
         assert resp.status == 200
 
