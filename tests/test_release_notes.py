@@ -164,6 +164,72 @@ def test_install_line_replaces_the_closing_sentence_for_one_release():
 
 
 
+def test_every_published_release_has_both_languages_and_survives_the_safety_filter():
+    import subprocess
+    import sys
+
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    script = ROOT / "scripts" / "sanitize_notes.py"
+    required = (
+        "ENG", "PL", "## ✨ Highlights", "## 🚀 New Features", "## 🛠 Improvements", "## 🐛 Bug Fixes",
+        "## 📚 Docs & CI", "## What's Changed", "## ✨ Najważniejsze", "## 🚀 Nowości", "## 🛠 Ulepszenia",
+        "## 🐛 Poprawki", "## 📚 Dokumentacja i CI", "## Co się zmieniło", "**Install on Android:**",
+        "**Instalacja na Androidzie:**", "**Full Changelog**:", "**Pełna historia zmian**:",
+    )
+    for row in release_notes.releases(text):
+        body = release_notes.bilingual_body(text, row["tag"], "")
+        for heading in required:
+            assert heading in body, row["tag"]
+        assert body.index("ENG") < body.index("# ") < body.index("PL")
+        cleaned = subprocess.run([sys.executable, str(script)], input=body, text=True, capture_output=True, check=True)
+        assert cleaned.stdout == body, row["tag"]
+
+
+def test_bilingual_v082_matches_the_approved_example():
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    generated = """## What's Changed
+* docs(release): separate "old number on the phone" line on renumbered releases by @JavsonOf in https://github.com/JavsonOf/agentic-os/pull/48
+* ci: CodeQL security scanning by @JavsonOf in https://github.com/JavsonOf/agentic-os/pull/50
+* feat: live view of what a working agent is doing by @JavsonOf in https://github.com/JavsonOf/agentic-os/pull/49
+
+**Full Changelog**: https://github.com/JavsonOf/agentic-os/compare/v0.8.1...v0.8.2
+"""
+    body = release_notes.bilingual_body(text, "v0.8.2", generated)
+    expected = (ROOT / "tests" / "fixtures" / "v0.8.2.md").read_text(encoding="utf-8")
+    assert body == expected
+
+
+def test_bilingual_body_keeps_every_section_and_translates_the_footer():
+    text = "## v0.2.0 – Something\n\n### Naprawiono\n- Jedna poprawka.\n"
+    body = release_notes.bilingual_body(text, "v0.2.0", "")
+    for heading in ("ENG", "PL", "## ✨ Highlights", "## 🚀 New Features", "## 🛠 Improvements",
+                    "## 🐛 Bug Fixes", "## 📚 Docs & CI", "## What's Changed", "## ✨ Najważniejsze",
+                    "## 🚀 Nowości", "## 🛠 Ulepszenia", "## 🐛 Poprawki", "## 📚 Dokumentacja i CI",
+                    "## Co się zmieniło"):
+        assert heading in body
+    assert "- No new features in this release." in body
+    assert "- Brak nowych funkcji w tym wydaniu." in body
+    assert "- No improvements in this release." in body
+    assert "- Jedna poprawka." in body
+    assert "AgenticOS_v0.2.0.apk" in body
+    assert "https://github.com/JavsonOf/agentic-os/commits/v0.2.0" in body
+    assert body.index("ENG") < body.index("PL")
+
+
+def test_explicit_language_blocks_are_not_polish_changelog_points():
+    text = """## v0.1.0 – First
+
+### Naprawiono
+- Polska poprawka.
+
+#### EN Bug Fixes
+- English fix.
+"""
+    assert release_notes.notes_for_tag(text, "v0.1.0") == "### Naprawiono\n- Polska poprawka."
+    body = release_notes.bilingual_body(text, "v0.1.0", "")
+    assert "- English fix." in body and body.index("- English fix.") < body.index("PL")
+
+
 def test_renumbered_releases_are_listed_oldest_first_and_explained_on_the_release_page():
     text = ("## Następne wydanie\n\n## v0.6.2 – Two\n_01.11.2026 · przenumerowane z v0.8.0_\n\n### Ulepszono\n- Dwa.\n\n"
             "## v0.6.1 – One\n_01.11.2026 · przenumerowane z v0.7.0_\n\n### Ulepszono\n- Jeden.\n\n"

@@ -6,7 +6,7 @@ name: release-notes
 on:
   push:
     branches: [main]
-    paths: ["CHANGELOG.md", "scripts/release_notes.py", ".github/workflows/release-notes.yml"]
+    paths: ["CHANGELOG.md", "scripts/release_notes.py", "scripts/sanitize_notes.py", ".github/release.yml", ".github/workflows/release-notes.yml"]
   workflow_dispatch:
 
 permissions:
@@ -85,9 +85,19 @@ jobs:
           done
       - name: Update release titles and notes
         run: |
-          for tag in $(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-); do
+          # Curated bilingual notes come from CHANGELOG.md (scripts/release_notes.py). What's Changed,
+          # new contributors and the compare link come from GitHub's generate-notes API, using the
+          # categories in .github/release.yml. sanitize_notes.py drops any line that could leak a secret.
+          # The result is the English block, then the Polish block, with every section filled in.
+          repo="${{ github.repository }}"
+          tags=$(grep -oE '^## v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?(\+[0-9A-Za-z.]+)?' CHANGELOG.md | cut -c4-)
+          for tag in $tags; do
             if ! gh release view "$tag" > /dev/null 2>&1; then echo "No release $tag, skipped"; continue; fi
-            python3 scripts/release_notes.py --tag "$tag" > notes.md
-            gh release edit "$tag" --title "$tag – $(python3 scripts/release_notes.py --title "$tag")" --notes-file notes.md
+            prev=$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-renumber' | awk -v t="$tag" 'f{print;exit} $0==t{f=1}')
+            args=(-f tag_name="$tag")
+            [ -n "$prev" ] && args+=(-f previous_tag_name="$prev")
+            gh api -X POST "repos/$repo/releases/generate-notes" "${args[@]}" --jq .body > generated.md || : > generated.md
+            python3 scripts/release_notes.py --tag "$tag" --generated generated.md | python3 scripts/sanitize_notes.py > final.md
+            gh release edit "$tag" --title "$tag – $(python3 scripts/release_notes.py --title "$tag")" --notes-file final.md
             echo "Updated $tag"
           done
