@@ -1,0 +1,17 @@
+# Categories for GitHub "Generate release notes" (by PR label; add labels or use the labeler below)
+changelog:
+  exclude:
+    labels: [skip-changelog, security-internal]
+  categories:
+    - title: 🚀 New Features
+      labels: [feature, feat]
+    - title: 🛠 Improvements
+      labels: [improvement, enhancement, perf, refactor]
+    - title: 🐛 Bug Fixes
+      labels: [bug, fix]
+    - title: 📱 Android
+      labels: [android]
+    - title: 📚 Docs & CI
+      labels: [docs, ci, chore]
+    - title: Other Changes
+      labels: ["*"]

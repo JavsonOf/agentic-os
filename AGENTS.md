@@ -78,6 +78,8 @@ paste keys into chat, do not put keys in environment files you commit, and never
   docs) under "Drobne zmiany": they wait for the next real release. These lines become the GitHub release
   notes automatically, so keep them general: what changed for the user, never keys, passwords, addresses,
   internal paths or how a security problem could be exploited (say "Poprawiono bezpieczeństwo …" instead).
+  The GitHub page is bilingual. Under the Polish points, add `#### EN Highlights` and `#### EN` sections
+  (New Features, Improvements, Bug Fixes, Docs & CI) plus `#### PL Tytuł` and `#### PL Najważniejsze`.
 
 ## Release versions and names
 
@@ -87,8 +89,8 @@ paste keys into chat, do not put keys in environment files you commit, and never
   integrations (points under "Dodano"). PATCH: fixes, improvements, CI/CD, refactoring and docs. Put CI and
   docs work under "Zmieniono" or "Drobne zmiany", not "Dodano", so it does not bump MINOR.
 - Release title, in English because the repository is public: `vX.Y.Z – Short Title Case Summary`
-  (e.g. `v0.2.1 – Clear Connection Errors in the Android App`), without "Agentic OS" or "Release". The notes
-  stay in Polish. Write the title in the `Tytuł:` line of **Następne wydanie** in `CHANGELOG.md`.
+  (e.g. `v0.2.1 – Clear Connection Errors in the Android App`), without "Agentic OS" or "Release". The GitHub
+  notes are English, then Polish. Write the title in the `Tytuł:` line of **Następne wydanie** in `CHANGELOG.md`.
 - The version is computed automatically. Add `Wersja: major` or `Wersja: minor` only when that automatic
   bump is too small. For a test build add `alpha`, `beta` or `rc` to the same line (see below).
 - Release notes are detailed: when a change has several parts (agents, skills, screens, features), list each
